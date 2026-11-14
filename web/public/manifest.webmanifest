@@ -1,0 +1,15 @@
+{
+  "name": "Hiking Book",
+  "short_name": "Hiking Book",
+  "description": "Our hikes: maps, elevation profiles, photos and stories.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#F0D6E0",
+  "theme_color": "#FA9F95",
+  "icons": [
+    { "src": "icons/dn-icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/dn-icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/dn-icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" href="./icons/dn-favicon-64.png">
+    <link rel="manifest" href="./manifest.webmanifest">
+    <meta name="theme-color" content="#FA9F95">
+    <link rel="apple-touch-icon" href="./icons/dn-apple-touch-180.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="Hiking Book">
+    <title>Hiking Book</title>
+</head>
+<body>
+    <header class="site-bar">
+        <a class="home" href="./index.html">Hiking Book</a>
+        <button class="pill install-button" id="install" type="button" hidden>Install</button>
+    </header>
+    <p class="install-hint" id="install-hint" hidden>
+        On iPhone or iPad: tap the Share button, then <strong>Add to Home Screen</strong>.
+    </p>
+
+    <main class="directory sheet">
+        <section class="intro">
+            <h1>Our hikes</h1>
+            <p class="lead" id="totals"></p>
+        </section>
+
+        <div class="hike-grid" id="hike-grid"></div>
+    </main>
+
+    <script type="module" src="/src/directory.js"></script>
+</body>
+</html>

@@ -1,0 +1,273 @@
+/* ==========================================
+   Hiking Book
+   The four palette colors below are defaults: on every page they are
+   replaced by colors picked from the background photo (tools/hikebook/palette.py,
+   applied in src/lib/backdrop.js).
+   ========================================== */
+:root {
+    --paper: #EEF0EA;        /* light tint: the frosted sheet */
+    --ink: #17261F;          /* deep shade: text, dark blocks, profile */
+    --accent: #C8102E;       /* vivid color: drop cap, links, highlights */
+    --soft: #9A6B3F;         /* muted mid-tone: thin rules, axes */
+
+    /* derived from the palette */
+    --ink-soft: color-mix(in srgb, var(--ink) 68%, var(--paper));
+    --paper-deep: color-mix(in srgb, var(--paper) 86%, var(--ink));
+    --rule: color-mix(in srgb, var(--soft) 55%, transparent);
+    --glass-opacity: 72%;    /* set from glassOpacity in config.js */
+    --glass: color-mix(in srgb, var(--paper) var(--glass-opacity), transparent);
+    --block: var(--ink);     /* nearest ridges of the generated landscape */
+
+    --snow: #FFFFFF;
+    --gold: #F2C14E;         /* waypoints */
+
+    --font-sign: 'Barlow Condensed', 'Arial Narrow', 'Roboto Condensed', sans-serif;
+    --font-book: 'Source Serif 4', Georgia, 'Times New Roman', serif;
+
+    /* type scale (1.25 ratio) */
+    --step--1: 0.85rem;
+    --step-0: 1.0625rem;
+    --step-1: 1.33rem;
+    --step-2: 1.66rem;
+    --step-3: 2.08rem;
+    --step-5: clamp(2.6rem, 6vw, 4.6rem);
+
+    --page: 1080px;
+    --gutter: clamp(18px, 4vw, 40px);
+    --radius-sheet: 22px;
+    --radius: 12px;
+}
+
+/* Dark theme defaults (replaced by the photo's own dark palette) */
+:root[data-theme='dark'] {
+    --paper: #17261F;
+    --ink: #EEF0EA;
+    --accent: #FF8A7A;
+    --soft: #7A8F84;
+    --block: color-mix(in srgb, var(--paper) 70%, black);
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html {
+    -webkit-text-size-adjust: 100%;
+    background: var(--paper-deep);
+}
+
+body {
+    margin: 0;
+    position: relative;
+    color: var(--ink);
+    font-family: var(--font-book);
+    font-size: var(--step-0);
+    line-height: 1.6;
+}
+
+h1, h2, h3 {
+    font-family: var(--font-sign);
+    font-weight: 600;
+    line-height: 1.02;
+    letter-spacing: 0.005em;
+    margin: 0;
+}
+
+a { color: inherit; }
+
+[hidden] { display: none !important; }
+
+:focus-visible {
+    outline: 3px solid var(--accent);
+    outline-offset: 3px;
+    border-radius: 4px;
+}
+
+img { display: block; max-width: 100%; }
+
+/* --- Site bar: book title (sits on the photo) --- */
+.site-bar {
+    max-width: calc(var(--page) + 2 * var(--gutter));
+    margin: 0 auto;
+    padding: 20px var(--gutter);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    font-family: var(--font-sign);
+    font-size: var(--step-1);
+    font-weight: 600;
+}
+
+.home {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    text-decoration: none;
+}
+
+.error {
+    grid-column: 1 / -1;
+    font-family: var(--font-sign);
+    font-size: var(--step-1);
+    color: var(--accent);
+}
+
+/* --- Slightly blurred photo behind everything (src/lib/backdrop.js) --- */
+.backdrop {
+    position: fixed;
+    inset: -40px;          /* bleed past the edges so the blur has no soft border */
+    z-index: -1;
+    overflow: hidden;
+    opacity: 0;
+    transition: opacity 0.8s ease;
+    pointer-events: none;
+}
+.backdrop.ready { opacity: 1; }
+
+.backdrop img,
+.backdrop-map {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    filter: blur(var(--backdrop-blur, 3px)) saturate(1.1);
+}
+.backdrop-map { background: var(--paper-deep); }
+
+/* A light veil at the top so the site title stays readable on any photo */
+.backdrop::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to bottom,
+        color-mix(in srgb, var(--paper) 60%, transparent) 0,
+        transparent 160px,
+        color-mix(in srgb, var(--ink) 14%, transparent));
+}
+
+/* Light text in the dark theme needs a stronger veil on bright photos */
+:root[data-theme='dark'] .backdrop::after {
+    background: linear-gradient(to bottom,
+        color-mix(in srgb, var(--paper) 85%, transparent) 0,
+        color-mix(in srgb, var(--paper) 35%, transparent) 150px,
+        color-mix(in srgb, var(--paper) 25%, transparent));
+}
+:root[data-theme='dark'] .back { color: color-mix(in srgb, var(--ink) 85%, transparent); }
+
+.backdrop-credit {
+    position: fixed;
+    left: 8px;
+    bottom: 4px;
+    margin: 0;
+    font-size: 10px;
+    color: var(--ink-soft);
+    z-index: 1;
+}
+
+/* --- The frosted-glass sheet the content sits on --- */
+.sheet {
+    max-width: calc(var(--page) + 2 * var(--gutter));
+    margin: 0 auto 72px;
+    background: var(--glass);
+    -webkit-backdrop-filter: blur(22px) saturate(1.4);
+    backdrop-filter: blur(22px) saturate(1.4);
+    border: 1px solid color-mix(in srgb, var(--ink) 14%, transparent);
+    border-radius: var(--radius-sheet);
+    box-shadow: 0 30px 80px color-mix(in srgb, var(--ink) 30%, transparent);
+    overflow: hidden;
+}
+
+@media (max-width: 720px) {
+    .sheet {
+        border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
+        margin-bottom: 0;
+        border-bottom: 0;
+    }
+}
+
+/* --- Profile cut-outs (src/lib/silhouette.js) --- */
+.ridge {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    overflow: visible;
+}
+.ridge path {
+    fill: none;
+    stroke: color-mix(in srgb, var(--ink) 75%, transparent);
+    stroke-width: 1.5px;
+    stroke-linejoin: round;
+}
+
+/* The masked picture layer of a card or header */
+.card-art,
+.hero-art {
+    position: absolute;
+    inset: 0;
+    -webkit-mask-size: 100% 100%;
+    mask-size: 100% 100%;
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+}
+.card-art img,
+.hero-art img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* --- Generated landscape for hikes without a main photo (src/lib/scenery.js) --- */
+:root {
+    --sky-high: color-mix(in srgb, var(--accent) 38%, var(--paper));
+    --sky-low: color-mix(in srgb, var(--soft) 30%, var(--paper));
+}
+:root[data-theme='dark'] {
+    --sky-high: color-mix(in srgb, var(--paper) 70%, var(--soft));
+    --sky-low: color-mix(in srgb, var(--accent) 45%, var(--paper));
+}
+
+.scenery {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    background: linear-gradient(to bottom, var(--sky-high), var(--sky-low) 75%);
+}
+.scenery svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+}
+.scenery-mist {
+    fill: var(--sky-low);
+    opacity: 0.3;
+    filter: blur(2px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { transition: none !important; animation: none !important; }
+}
+
+/* --- Small rounded buttons (Install, Save for offline) --- */
+.pill {
+    font: inherit;
+    font-family: var(--font-sign);
+    font-size: var(--step-0);
+    font-weight: 600;
+    padding: 6px 16px;
+    border-radius: 999px;
+    border: 1px solid color-mix(in srgb, var(--ink) 30%, transparent);
+    background: color-mix(in srgb, var(--paper) 70%, transparent);
+    color: var(--ink);
+    cursor: pointer;
+}
+.pill:hover { border-color: var(--accent); color: var(--accent); }
+.pill:disabled { opacity: 0.6; cursor: progress; }
+
+.install-hint {
+    max-width: calc(var(--page) + 2 * var(--gutter));
+    margin: -8px auto 16px;
+    padding: 0 var(--gutter);
+    text-align: right;
+    font-size: var(--step--1);
+}

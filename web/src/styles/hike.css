@@ -1,0 +1,199 @@
+.back {
+    font-size: var(--step-0);
+    font-weight: 500;
+    text-decoration: none;
+    color: var(--ink-soft);
+}
+.back:hover { color: var(--accent); }
+
+/* --- Hero: cover photo (or dark block) with the full profile cut out of it --- */
+.hero {
+    position: relative;
+    height: clamp(240px, 52vh, 540px);
+}
+
+/* --- Page column --- */
+.page {
+    padding: 0 var(--gutter) 96px;
+}
+
+.title-block { margin-top: -8px; }
+
+.title-block h1 {
+    font-size: var(--step-5);
+    font-weight: 700;
+}
+
+.subtitle {
+    margin: 8px 0 0;
+    font-size: var(--step-1);
+    font-style: italic;
+    color: var(--ink-soft);
+}
+
+/* --- Stats: signpost numbers --- */
+.stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+    gap: 16px clamp(16px, 3vw, 32px);
+    margin: 32px 0 0;
+    padding: 18px 0;
+    border-top: 2px solid var(--ink);
+    border-bottom: 1px solid var(--rule);
+}
+
+.stat { display: flex; flex-direction: column; }
+
+.stat dd {
+    order: 1;
+    margin: 0;
+    font-family: var(--font-sign);
+    font-size: var(--step-3);
+    font-weight: 600;
+    line-height: 1.05;
+    white-space: nowrap;
+}
+
+.stat dt {
+    order: 2;
+    font-size: var(--step--1);
+    color: var(--ink-soft);
+}
+
+@media (max-width: 640px) {
+    .stats { grid-template-columns: repeat(3, 1fr); }
+    .stat dd { font-size: var(--step-2); }
+}
+
+/* --- Description: reads like a book --- */
+.description {
+    max-width: 38rem;
+    margin-top: 36px;
+    font-size: 1.125rem;
+    line-height: 1.7;
+}
+.description p { margin: 0 0 1em; }
+.description p:first-child::first-letter {
+    float: left;
+    font-family: var(--font-sign);
+    font-weight: 700;
+    font-size: 3.6em;
+    line-height: 0.82;
+    margin: 0.06em 0.08em 0 0;
+    color: var(--accent);
+}
+.companions { font-style: italic; color: var(--ink-soft); }
+
+/* --- Map + profile: one block, they're linked on hover --- */
+.terrain { margin-top: 48px; }
+
+#map-container {
+    height: clamp(320px, 55vh, 520px);
+    border-radius: var(--radius);
+    background: var(--paper-deep);
+    z-index: 0;
+}
+
+#elevation-container {
+    margin-top: 2px;
+    padding: 18px 0 0;
+}
+
+#elevation-container svg { display: block; overflow: visible; touch-action: pan-y; }
+
+.domain { stroke: var(--soft); }
+.tick line { stroke: var(--rule); }
+.tick text {
+    fill: var(--ink-soft);
+    font-family: var(--font-sign);
+    font-size: 13px;
+}
+.grid-line line { stroke: color-mix(in srgb, var(--soft) 28%, transparent); }
+.grid-line .domain { display: none; }
+
+.legend {
+    margin: 12px 0 0;
+    font-size: var(--step--1);
+    color: var(--ink-soft);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 28px;
+}
+.legend-item { display: inline-flex; align-items: center; gap: 8px; }
+.legend-bar {
+    display: inline-block;
+    width: 80px;
+    height: 7px;
+    border-radius: 2px;
+}
+
+/* --- Tooltip shared by map and profile --- */
+#tooltip {
+    position: absolute;
+    z-index: 1000;
+    padding: 6px 10px;
+    background: var(--ink);
+    color: var(--paper);
+    border-radius: 8px;
+    font-family: var(--font-sign);
+    font-size: 16px;
+    line-height: 1.25;
+    pointer-events: none;
+    opacity: 0;
+    transform: translate(-50%, -100%);
+    white-space: nowrap;
+}
+.tooltip-waypoint { color: var(--gold); font-weight: 600; }
+
+/* Leaflet attribution in our fonts */
+.leaflet-container { font-family: var(--font-book); }
+.leaflet-control-attribution { font-size: 10px; }
+.leaflet-tooltip {
+    font-family: var(--font-sign);
+    font-size: 15px;
+    border-radius: 8px;
+    border: 0;
+    background: var(--ink);
+    color: var(--paper);
+    box-shadow: none;
+}
+.leaflet-tooltip::before { display: none; }
+
+/* --- Your location --- */
+.locate-control .locate-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    border: 0;
+    border-radius: 4px;
+    background: #FFF;
+    color: #333;
+    cursor: pointer;
+}
+.locate-control .locate-button:hover { background: #F4F4F4; }
+.locate-control .locate-button.active { color: #2A7FFF; }
+
+.you-status {
+    margin: 10px 0 0;
+    padding: 8px 14px;
+    border-radius: 10px;
+    background: color-mix(in srgb, #2A7FFF 14%, transparent);
+    border-left: 4px solid #2A7FFF;
+    font-size: var(--step--1);
+}
+
+.you-marker line { stroke: #2A7FFF; stroke-width: 2; stroke-dasharray: 3 3; }
+.you-marker circle { fill: #2A7FFF; stroke: #FFF; stroke-width: 3; }
+
+/* --- Save for offline --- */
+.offline-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 16px;
+}
+.offline-status { font-size: var(--step--1); color: var(--ink-soft); }
