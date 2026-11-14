@@ -124,16 +124,21 @@
 /* --- Credit line (required by the map providers): small and quiet --- */
 .leaflet-container .leaflet-control-attribution {
     margin: 0;
-    padding: 2px 8px;
-    border-top-left-radius: 4px;
-    background: color-mix(in srgb, var(--paper) 62%, transparent);
-    -webkit-backdrop-filter: blur(8px);
-    backdrop-filter: blur(8px);
-    color: color-mix(in srgb, var(--ink) 65%, transparent);
+    padding: 1px 6px;
+    max-width: 75%;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    border-top-left-radius: 3px;
+    background: color-mix(in srgb, var(--paper) 55%, transparent);
+    color: color-mix(in srgb, var(--ink) 60%, transparent);
     font-family: var(--font-sign);
-    font-size: 10px;
-    letter-spacing: 0.01em;
+    font-size: 8.5px;
+    line-height: 1.4;
 }
+/* Tap or hover shows the whole credit line if it was cut off */
+.leaflet-container .leaflet-control-attribution:hover,
+.leaflet-container .leaflet-control-attribution:focus-within { max-width: none; white-space: normal; }
 .leaflet-container .leaflet-control-attribution a {
     color: inherit;
     text-decoration: underline;

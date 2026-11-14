@@ -31,6 +31,7 @@ export function tileUrl(layer, z, x, y) {
 /** Adds the selected map plus a layer button to switch; applies the map's tint (look). */
 export function addMapLayers(map) {
     const container = map.getContainer();
+    map.attributionControl?.setPrefix(false); // no "Leaflet" + flag in front of the map credits
     const tileLayers = new Map(LAYERS.map((layer) => [layer, L.tileLayer(layer.url, {
         maxZoom: layer.maxZoom,
         subdomains: layer.subdomains ?? 'abc',

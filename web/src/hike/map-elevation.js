@@ -164,11 +164,12 @@ export function renderMapAndElevation(hike) {
         const hoverDot = hoverGroup.append('circle').attr('r', 6)
             .attr('fill', C.markerLight).attr('stroke', C.trail).attr('stroke-width', 2.5);
 
+        // Pointer events cover mouse, pen and finger. On a phone a sideways drag scrubs
+        // along the hike; an up/down swipe still scrolls the page (touch-action: pan-y).
         const onMove = (event) => {
             const [px] = d3.pointer(event);
             const i = bisect.center(data, x.invert(px));
-            const pt = event.touches?.[0] ?? event;
-            syncHover(data[i], pt.pageX, pt.pageY, 'elevation');
+            syncHover(data[i], event.pageX, event.pageY, 'elevation', event.pointerType === 'touch');
         };
         // "You are here" on the profile (blue, like the dot on the map)
         const youGroup = svg.append('g').attr('class', 'you-marker').style('display', 'none');
@@ -176,8 +177,9 @@ export function renderMapAndElevation(hike) {
         youGroup.append('circle').attr('r', 7);
 
         svg.append('rect').attr('width', width).attr('height', height).attr('fill', 'transparent')
-            .on('mouseout touchend', () => syncHover(null))
-            .on('mousemove touchmove', onMove);
+            .style('touch-action', 'pan-y')
+            .on('pointerdown pointermove', onMove)
+            .on('pointerleave', (event) => { if (event.pointerType === 'mouse') syncHover(null); });
 
         profile = { x, y, height, hoverGroup, hoverDot, youGroup };
         placeYou();
@@ -205,7 +207,7 @@ export function renderMapAndElevation(hike) {
     }).observe(container);
 
     // --- 5. SYNCHRONIZED HOVER ---
-    function syncHover(point, pageX, pageY, source) {
+    function syncHover(point, pageX, pageY, source, touch = false) {
         const { x, y, hoverGroup, hoverDot } = profile;
         if (!point) {
             mapHoverDot.setStyle({ opacity: 0, fillOpacity: 0 });
@@ -230,7 +232,7 @@ export function renderMapAndElevation(hike) {
         );
         tooltip.style.opacity = 1;
         tooltip.style.left = `${pageX}px`;
-        tooltip.style.top = `${pageY - 16}px`;
+        tooltip.style.top = `${pageY - (touch ? 48 : 16)}px`; // above the finger, not under it
     }
 
     map.on('mousemove', (e) => {
@@ -238,6 +240,60 @@ export function renderMapAndElevation(hike) {
         syncHover(closest, e.originalEvent.pageX, e.originalEvent.pageY, 'map');
     });
     map.on('mouseout', () => syncHover(null));
+
+    // Phones: put a finger on the trail and drag to follow it (the map stays put);
+    // touching anywhere else moves the map as usual.
+    const mapBox = map.getContainer();
+    const TOUCH_REACH = 28; // px around the line that count as "on the trail"
+    let following = null; // pointerId of the finger following the trail
+
+    const nearestOnScreen = (clientX, clientY) => {
+        const r = mapBox.getBoundingClientRect();
+        const px = clientX - r.left, py = clientY - r.top;
+        let best = null, bestD = Infinity;
+        for (const d of data) {
+            const p = map.latLngToContainerPoint([d.lat, d.lon]);
+            const dist2 = (p.x - px) ** 2 + (p.y - py) ** 2;
+            if (dist2 < bestD) { bestD = dist2; best = d; }
+        }
+        return { point: best, px: Math.sqrt(bestD) };
+    };
+    const follow = (event) => {
+        const { point } = nearestOnScreen(event.clientX, event.clientY);
+        syncHover(point, event.pageX, event.pageY, 'map', true);
+    };
+    const stopFollowing = () => {
+        if (following == null) return;
+        following = null;
+        map.dragging.enable();
+    };
+
+    // Capture phase, so we decide before Leaflet starts dragging the map
+    mapBox.addEventListener('pointerdown', (event) => {
+        if (event.pointerType !== 'touch' || following != null) return;
+        if (event.target.closest('.leaflet-control')) return; // buttons keep working
+        const { px } = nearestOnScreen(event.clientX, event.clientY);
+        if (px > TOUCH_REACH) {
+            syncHover(null);
+            return;
+        }
+        following = event.pointerId;
+        map.dragging.disable();
+        event.stopPropagation();
+        follow(event);
+    }, true);
+    mapBox.addEventListener('pointermove', (event) => {
+        if (event.pointerId !== following) return;
+        event.stopPropagation();
+        follow(event);
+    }, true);
+    for (const type of ['pointerup', 'pointercancel']) {
+        mapBox.addEventListener(type, (event) => { if (event.pointerId === following) stopFollowing(); }, true);
+    }
+    // Some phones also send touch events; keep them from panning while following the trail
+    for (const type of ['touchstart', 'touchmove']) {
+        mapBox.addEventListener(type, (event) => { if (following != null) event.stopPropagation(); }, { capture: true, passive: true });
+    }
 
     return {
         map,

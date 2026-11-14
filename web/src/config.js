@@ -13,22 +13,22 @@ export const APP_CONFIG = {
         {
             id: 'park', name: 'Park map', look: 'park',
             url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', maxZoom: 17,
-            attribution: 'Map data © OpenStreetMap contributors, SRTM · Style © OpenTopoMap (CC-BY-SA)',
+            attribution: '© OpenStreetMap · SRTM · OpenTopoMap (CC-BY-SA)',
         },
         {
             id: 'streets', name: 'Streets',
             url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', maxZoom: 19,
-            attribution: '© OpenStreetMap contributors',
+            attribution: '© OpenStreetMap',
         },
         {
             id: 'satellite', name: 'Satellite',
             url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', maxZoom: 19,
-            attribution: 'Tiles © Esri — Esri, Maxar, Earthstar Geographics, GIS User Community',
+            attribution: '© Esri, Maxar, Earthstar Geographics',
         },
         {
             id: 'topo', name: 'Topo',
             url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', maxZoom: 19,
-            attribution: 'Tiles © Esri — Esri, HERE, Garmin, USGS, NGA, EPA, NPS',
+            attribution: '© Esri, HERE, Garmin, USGS, NGA, NPS',
         },
     ],
 
