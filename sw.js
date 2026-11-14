@@ -12,7 +12,7 @@
 // new pages, and the saved hike data refreshed. The value here is only used
 // if sw.js is served without building.
 
-const VERSION = "14 Nov 2026, 11:55 · 1a21b65";
+const VERSION = "14 Nov 2026, 13:16 · ddbfa04";
 const PAGES = `hb-pages-${VERSION}`;
 const ASSETS = 'hb-assets';
 const DATA = 'hb-data';
@@ -24,7 +24,8 @@ const SCOPE = self.registration.scope; // e.g. https://you.github.io/hiking-book
 const CORE = ['', 'index.html', 'hike.html', 'manifest.webmanifest', 'data/hikes.json', 'data/backgrounds.json']
     .map((p) => new URL(p, SCOPE).href);
 
-const TILE_HOSTS = /(^|\.)tile\.opentopomap\.org$|(^|\.)tile\.openstreetmap\.org$/;
+// Map pictures for every map in config.js mapLayers (OpenTopoMap, OpenStreetMap, Esri)
+const TILE_HOSTS = /(^|\.)tile\.opentopomap\.org$|(^|\.)tile\.openstreetmap\.org$|(^|\.)arcgisonline\.com$/;
 
 /** Same tile from a.tile / b.tile / c.tile -> one cache entry. */
 function tileKey(url) {
