@@ -14,8 +14,10 @@ import { renderMapAndElevation } from './hike/map-elevation.js';
 import { renderGallery } from './hike/gallery.js';
 import { setupLocate } from './hike/locate.js';
 import { setupOfflineSave } from './hike/offline.js';
+import { watchForUpdates } from './lib/version.js';
 
 registerServiceWorker();
+watchForUpdates();
 
 function renderHero(hike) {
     const hero = document.getElementById('hero');
@@ -61,16 +63,6 @@ function renderHeader(hike) {
     }
 }
 
-function renderLegend() {
-    const stops = APP_CONFIG.slopeColors;
-    const gradient = `linear-gradient(to right, ${stops.map(([, c]) => c).join(', ')})`;
-    document.getElementById('legend').append(
-        'Line color shows steepness: ',
-        el('span', { className: 'legend-bar', style: `background: ${gradient}` }),
-        ` flat to ${stops[stops.length - 1][0]}%+`,
-    );
-}
-
 const id = new URLSearchParams(window.location.search).get('id');
 
 if (!id) {
@@ -83,7 +75,6 @@ if (!id) {
             renderHeader(hike);
             const view = renderMapAndElevation(hike);
             setupLocate(hike, view, document.getElementById('you-status'));
-            renderLegend();
             setupOfflineSave(hike, document.getElementById('save-offline'), document.getElementById('offline-status'));
             renderGallery(hike.photos);
         })

@@ -7,7 +7,10 @@
 //   icons/                          saved copy shown at once, refreshed in the background
 //   map tiles                       saved on first use, oldest dropped past MAX_TILES
 //
-// Bump VERSION to force everyone onto fresh pages after a big change.
+// VERSION is replaced with the build's version stamp on every `npm run build`
+// (see vite.config.js), so each deploy installs a fresh service worker:
+// new pages, and the saved hike data refreshed. The value here is only used
+// if sw.js is served without building.
 
 const VERSION = 'v4';
 const PAGES = `hb-pages-${VERSION}`;
@@ -21,7 +24,8 @@ const SCOPE = self.registration.scope; // e.g. https://you.github.io/hiking-book
 const CORE = ['', 'index.html', 'hike.html', 'manifest.webmanifest', 'data/hikes.json', 'data/backgrounds.json']
     .map((p) => new URL(p, SCOPE).href);
 
-const TILE_HOSTS = /(^|\.)tile\.opentopomap\.org$|(^|\.)tile\.openstreetmap\.org$/;
+// Map pictures for every map in config.js mapLayers (OpenTopoMap, OpenStreetMap, Esri)
+const TILE_HOSTS = /(^|\.)tile\.opentopomap\.org$|(^|\.)tile\.openstreetmap\.org$|(^|\.)arcgisonline\.com$/;
 
 /** Same tile from a.tile / b.tile / c.tile -> one cache entry. */
 function tileKey(url) {
@@ -33,9 +37,24 @@ self.addEventListener('install', (event) => {
         const cache = await caches.open(PAGES);
         // One failing file shouldn't stop the install
         await Promise.all(CORE.map((url) => cache.add(url).catch(() => {})));
+        await refreshData();
         await self.skipWaiting();
     })());
 });
+
+/** New version: fetch fresh copies of the saved hike data (hikes.json, each saved hike).
+ *  Offline or a hike that no longer exists: the old copy stays. */
+async function refreshData() {
+    const cache = await caches.open(DATA);
+    const urls = new Set((await cache.keys()).map((r) => r.url));
+    for (const url of CORE) if (url.includes('/data/')) urls.add(url);
+    await Promise.all([...urls].map(async (url) => {
+        try {
+            const response = await fetch(url, { cache: 'no-cache' });
+            if (response.ok) await cache.put(url, response);
+        } catch { /* keep the saved copy */ }
+    }));
+}
 
 self.addEventListener('activate', (event) => {
     event.waitUntil((async () => {

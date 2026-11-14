@@ -1,0 +1,170 @@
+/* Map buttons (zoom, your location, map layers) and the credit line,
+   restyled to match the book: quiet, nearly solid paper, ink, small corners. */
+
+.leaflet-container {
+    /* Tweak these to change all map buttons at once */
+    --ctl-size: 32px;
+    --ctl-radius: 6px;
+    --ctl-glass: color-mix(in srgb, var(--paper) 92%, transparent);
+    --ctl-border: color-mix(in srgb, var(--ink) 22%, transparent);
+    --ctl-shadow: 0 1px 3px color-mix(in srgb, var(--ink) 18%, transparent);
+}
+
+/* --- Button groups: zoom +/−, location --- */
+.leaflet-touch .leaflet-bar,
+.leaflet-bar {
+    border: 1px solid var(--ctl-border);
+    border-radius: var(--ctl-radius);
+    background: var(--ctl-glass);
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+    box-shadow: var(--ctl-shadow);
+    overflow: hidden;
+    background-clip: padding-box;
+}
+
+.leaflet-touch .leaflet-bar a,
+.leaflet-bar a,
+.locate-control .locate-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--ctl-size);
+    height: var(--ctl-size);
+    line-height: 1;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: var(--ink);
+    font-family: var(--font-sign);
+    font-size: 19px;
+    font-weight: 500;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background-color 0.15s, color 0.15s;
+}
+.leaflet-touch .leaflet-bar a:first-child,
+.leaflet-bar a:first-child { border-radius: 0; }
+.leaflet-bar a + a { border-top: 1px solid var(--ctl-border); }
+
+.leaflet-bar a:hover,
+.leaflet-bar a:focus-visible,
+.locate-control .locate-button:hover,
+.locate-control .locate-button:focus-visible {
+    background: color-mix(in srgb, var(--paper) 55%, white);
+    color: var(--accent);
+}
+.leaflet-bar a.leaflet-disabled,
+.leaflet-bar a.leaflet-disabled:hover {
+    background: transparent;
+    color: color-mix(in srgb, var(--ink) 30%, transparent);
+    cursor: default;
+}
+
+.locate-control .locate-button.active { color: #2A7FFF; }
+
+/* --- Map layers: a round button with a "stack" icon, opens a small glass menu --- */
+.leaflet-touch .leaflet-control-layers,
+.leaflet-control-layers {
+    border: 1px solid var(--ctl-border);
+    border-radius: var(--ctl-radius);
+    background: var(--ctl-glass);
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+    box-shadow: var(--ctl-shadow);
+    color: var(--ink);
+}
+
+.leaflet-touch .leaflet-control-layers-toggle,
+.leaflet-retina .leaflet-control-layers-toggle,
+.leaflet-control-layers-toggle {
+    width: var(--ctl-size);
+    height: var(--ctl-size);
+    background: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--ink);
+}
+.leaflet-control-layers-toggle::before {
+    content: '';
+    width: 17px;
+    height: 17px;
+    background: currentColor;
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linejoin='round'%3E%3Cpath d='M12 3 2 8.5 12 14l10-5.5L12 3z'/%3E%3Cpath d='m2 13.5 10 5.5 10-5.5'/%3E%3C/svg%3E") center / contain no-repeat;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linejoin='round'%3E%3Cpath d='M12 3 2 8.5 12 14l10-5.5L12 3z'/%3E%3Cpath d='m2 13.5 10 5.5 10-5.5'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+.leaflet-control-layers-toggle:hover { color: var(--accent); }
+
+.leaflet-control-layers-expanded {
+    padding: 4px;
+    min-width: 130px;
+}
+.leaflet-control-layers-list { font-family: var(--font-sign); font-size: var(--step-0); }
+.leaflet-control-layers-base label { margin: 0; }
+.leaflet-control-layers-base label > span,
+.leaflet-control-layers-base label > div {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 9px;
+    border-radius: 3px;
+    cursor: pointer;
+}
+.leaflet-control-layers-base label:hover > span,
+.leaflet-control-layers-base label:hover > div { background: color-mix(in srgb, var(--paper) 55%, white); }
+.leaflet-control-layers-selector {
+    margin: 0;
+    top: 0;
+    accent-color: var(--accent);
+}
+.leaflet-control-layers-separator { display: none; }
+
+/* --- Credit line (required by the map providers): small and quiet --- */
+.leaflet-container .leaflet-control-attribution {
+    margin: 0;
+    padding: 2px 8px;
+    border-top-left-radius: 4px;
+    background: color-mix(in srgb, var(--paper) 62%, transparent);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+    color: color-mix(in srgb, var(--ink) 65%, transparent);
+    font-family: var(--font-sign);
+    font-size: 10px;
+    letter-spacing: 0.01em;
+}
+.leaflet-container .leaflet-control-attribution a {
+    color: inherit;
+    text-decoration: underline;
+    text-decoration-color: color-mix(in srgb, var(--ink) 30%, transparent);
+}
+.leaflet-container .leaflet-control-attribution a:hover { color: var(--accent); }
+
+/* A little breathing room from the map's edge */
+.leaflet-top.leaflet-left .leaflet-control,
+.leaflet-top.leaflet-right .leaflet-control { margin-top: 10px; }
+.leaflet-left .leaflet-control { margin-left: 10px; }
+.leaflet-right .leaflet-control { margin-right: 10px; }
+.leaflet-bottom.leaflet-right .leaflet-control-attribution { margin-right: 0; }
+
+/* --- Stop symbols (src/lib/stops.js) and their names, lettered like a printed park map --- */
+.leaflet-marker-icon.stop-symbol { background: none; border: 0; }
+.stop-symbol svg { display: block; }
+
+.leaflet-tooltip.map-label {
+    background: none;
+    border: 0;
+    box-shadow: none;
+    padding: 0 0 0 1px;
+    margin: 0;
+    font-family: var(--font-sign);
+    font-size: 12.5px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    color: var(--ink);
+    text-shadow: 0 0 2px var(--paper), 0 0 2px var(--paper), 0 0 3px var(--paper), 0 0 4px var(--paper);
+}
+.leaflet-tooltip.map-label::before { display: none; }
+.leaflet-tooltip.map-label-peak { font-size: 13px; }
+

@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Map test (dev only)</title>
+</head>
+<body>
+    <!-- Temporary page for trying map looks. Only in `npm run dev`
+         (http://127.0.0.1:5180/map-test.html); it is not part of the built book. -->
+    <header class="mt-bar">
+        <h1>Test page</h1>
+        <label>Hike <select id="hike"></select></label>
+        <label>Look <select id="look"></select></label>
+        <label>Map <select id="map"></select></label>
+        <label><input type="checkbox" id="line-edge"> light edge on trail</label>
+        <label>Stops <select id="stops">
+            <option value="symbols">Map symbols + names</option>
+            <option value="symbols-nolabel">Map symbols, names on hover</option>
+            <option value="ticks">Tiny ticks + names</option>
+            <option value="dots">Plain dots (before)</option>
+        </select></label>
+        <span class="mt-hint">Drag or zoom one map, the others follow. Hover a stop for its name; the ring a third of the way along is the dot that follows your finger.</span>
+    </header>
+    <h2 class="mt-section">Trail &amp; stops</h2>
+    <main class="mt-grid" id="trails"></main>
+    <h2 class="mt-section">Elevation profile
+        <label class="mt-inline">fill <select id="fill">
+            <option value="relief">Shaded-relief brown</option>
+            <option value="relief-fade">Relief brown, fading down</option>
+            <option value="olive">Olive</option>
+            <option value="khaki">Khaki</option>
+            <option value="pale">Pale, with ink outline</option>
+            <option value="ink">Page ink (before: navy on the pink look)</option>
+        </select></label></h2>
+    <section class="mt-slopes" id="slopes"></section>
+    <script type="module" src="/src/map-test.js"></script>
+</body>
+</html>

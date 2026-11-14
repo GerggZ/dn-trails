@@ -111,70 +111,70 @@
 .grid-line line { stroke: color-mix(in srgb, var(--soft) 28%, transparent); }
 .grid-line .domain { display: none; }
 
-.legend {
-    margin: 12px 0 0;
-    font-size: var(--step--1);
-    color: var(--ink-soft);
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px 28px;
-}
-.legend-item { display: inline-flex; align-items: center; gap: 8px; }
-.legend-bar {
-    display: inline-block;
-    width: 80px;
-    height: 7px;
-    border-radius: 2px;
-}
-
 /* --- Tooltip shared by map and profile --- */
+/* Hover readout: a small label like a map legend – paper, thin ink rule, no color */
 #tooltip {
     position: absolute;
     z-index: 1000;
-    padding: 6px 10px;
-    background: var(--ink);
-    color: var(--paper);
-    border-radius: 8px;
+    padding: 5px 9px 6px;
+    background: color-mix(in srgb, var(--paper) 94%, white);
+    color: var(--ink);
+    border: 1px solid color-mix(in srgb, var(--ink) 28%, transparent);
+    border-radius: 3px;
+    box-shadow: 0 1px 4px color-mix(in srgb, var(--ink) 18%, transparent);
     font-family: var(--font-sign);
-    font-size: 16px;
-    line-height: 1.25;
+    line-height: 1.2;
     pointer-events: none;
     opacity: 0;
-    transform: translate(-50%, -100%);
+    transform: translate(-50%, calc(-100% - 6px));
     white-space: nowrap;
+    text-align: center;
 }
-.tooltip-waypoint { color: var(--gold); font-weight: 600; }
+.tooltip-waypoint {
+    margin-bottom: 2px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: color-mix(in srgb, var(--ink) 70%, transparent);
+}
+.tooltip-elev { font-size: 17px; font-weight: 600; }
+.tooltip-meta {
+    font-size: 13px;
+    color: color-mix(in srgb, var(--ink) 70%, transparent);
+    font-variant-numeric: tabular-nums;
+}
+
+/* Name + height above the ▲ on the elevation profile */
+.profile-peak-label {
+    font-family: var(--font-sign);
+    font-size: 12.5px;
+    font-weight: 600;
+    fill: var(--ink);
+    paint-order: stroke;
+    stroke: var(--paper);
+    stroke-width: 3px;
+    stroke-linejoin: round;
+}
+.profile-stops title { pointer-events: none; }
 
 /* Leaflet attribution in our fonts */
 .leaflet-container { font-family: var(--font-book); }
-.leaflet-control-attribution { font-size: 10px; }
 .leaflet-tooltip {
     font-family: var(--font-sign);
-    font-size: 15px;
-    border-radius: 8px;
-    border: 0;
-    background: var(--ink);
-    color: var(--paper);
-    box-shadow: none;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 3px;
+    border: 1px solid color-mix(in srgb, var(--ink) 28%, transparent);
+    background: color-mix(in srgb, var(--paper) 94%, white);
+    color: var(--ink);
+    box-shadow: 0 1px 4px color-mix(in srgb, var(--ink) 18%, transparent);
 }
 .leaflet-tooltip::before { display: none; }
 
 /* --- Your location --- */
-.locate-control .locate-button {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 34px;
-    height: 34px;
-    padding: 0;
-    border: 0;
-    border-radius: 4px;
-    background: #FFF;
-    color: #333;
-    cursor: pointer;
-}
-.locate-control .locate-button:hover { background: #F4F4F4; }
-.locate-control .locate-button.active { color: #2A7FFF; }
+/* (the map buttons themselves are styled in map-controls.css) */
 
 .you-status {
     margin: 10px 0 0;

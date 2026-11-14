@@ -5,6 +5,8 @@ import 'leaflet/dist/leaflet.css';
 import { APP_CONFIG } from '../config.js';
 import { dist, elev, distUnit, elevUnit } from '../lib/units.js';
 import { el } from '../lib/data.js';
+import { addMapLayers } from '../lib/map-layers.js';
+import { stopsFor, stopSvg, stopSize } from '../lib/stops.js';
 
 const C = APP_CONFIG.colors;
 
@@ -17,6 +19,12 @@ const slopeColor = (() => {
         .clamp(true);
     return (gradePct) => scale(Math.abs(gradePct));
 })();
+
+/** Steepness at a point for the readout: "+12%", "−8%" or "flat". */
+function gradeText(point) {
+    const g = Math.round(point.grade);
+    return Math.abs(g) < 1 ? 'flat' : `${g > 0 ? '+' : '−'}${Math.abs(g)}%`;
+}
 
 export function renderMapAndElevation(hike) {
     const t = hike.track;
@@ -38,6 +46,7 @@ export function renderMapAndElevation(hike) {
         elevation: elev(t.ele_m[i]),
         lat: t.lat[i],
         lon: t.lon[i],
+        grade: smoothGrade[i],
         color: slopeColor(smoothGrade[i]),
     }));
 
@@ -48,22 +57,31 @@ export function renderMapAndElevation(hike) {
     // Mouse wheel / trackpad over the map zooms the map instead of scrolling the page
     const map = L.map('map-container', { scrollWheelZoom: true, wheelPxPerZoomLevel: 90 }).fitBounds(hike.bbox, { padding: [30, 30] });
 
-    const tiles = APP_CONFIG.mapTiles;
-    L.tileLayer(tiles.url, { attribution: tiles.attribution, maxZoom: tiles.maxZoom }).addTo(map);
+    addMapLayers(map); // Park map / Streets / Satellite / Topo, with a layer button (config.js mapLayers)
 
-    // White casing under a red line, like a painted trail blaze
+    // The trail: one solid line, like on a printed park map (optional light edge underneath)
     const latlngs = data.map((d) => [d.lat, d.lon]);
-    L.polyline(latlngs, { color: C.trailCasing, weight: 8, opacity: 0.9, lineCap: 'round', lineJoin: 'round', interactive: false }).addTo(map);
+    if (C.trailCasing) {
+        L.polyline(latlngs, { color: C.trailCasing, weight: 8, opacity: 0.9, lineCap: 'round', lineJoin: 'round', interactive: false }).addTo(map);
+    }
     L.polyline(latlngs, { color: C.trail, weight: 4, opacity: 1, lineCap: 'round', lineJoin: 'round', interactive: false }).addTo(map);
 
-    waypoints.forEach((wp) => {
-        L.circleMarker([wp.lat, wp.lon], {
-            radius: 6, color: C.waypoint, weight: 3, fillColor: C.markerDark, fillOpacity: 1,
-        }).bindTooltip(wp.name, { direction: 'top', offset: [0, -6] }).addTo(map);
-    });
+    // Trailhead, end, highest point and stops as map symbols (src/lib/stops.js), with their names
+    const stops = stopsFor(hike, (m) => `${Math.round(elev(m)).toLocaleString('en')} ${elevUnit()}`);
+    const namesAlways = APP_CONFIG.stopNames !== 'hover';
+    for (const s of stops) {
+        const size = stopSize(s.kind);
+        const icon = L.divIcon({ className: 'stop-symbol', html: stopSvg(s.kind), iconSize: [size, size], iconAnchor: [size / 2, size / 2] });
+        L.marker(latlngs[s.index], { icon, keyboard: false, zIndexOffset: s.kind === 'stop' ? 0 : 100 })
+            .bindTooltip(s.name, namesAlways
+                ? { permanent: true, direction: 'right', offset: [5, 0], className: `map-label map-label-${s.kind}` }
+                : { direction: 'top', offset: [0, -6] })
+            .addTo(map);
+    }
 
+    // The dot that follows your finger: a hollow ring in the trail color
     const mapHoverDot = L.circleMarker([0, 0], {
-        radius: 6, color: C.markerLight, weight: 2, fillColor: C.markerDark, fillOpacity: 1,
+        radius: 7, color: C.trail, weight: 2.5, fillColor: C.markerLight, fillOpacity: 0.85,
         interactive: false,
     }).addTo(map);
     mapHoverDot.setStyle({ opacity: 0, fillOpacity: 0 });
@@ -79,9 +97,8 @@ export function renderMapAndElevation(hike) {
 
     function drawProfile() {
         container.replaceChildren();
-        // Colors follow the page palette (picked from the background photo)
-        const css = getComputedStyle(document.documentElement);
-        const terrain = css.getPropertyValue('--ink').trim() || C.terrain;
+        // Fill under the profile: shaded-relief brown, like hillshading on a park map
+        const terrain = C.terrain;
         const outerWidth = container.clientWidth || 900;
         const narrow = outerWidth < 560;
         const margin = { top: 12, right: 8, bottom: 30, left: narrow ? 46 : 56 };
@@ -118,14 +135,22 @@ export function renderMapAndElevation(hike) {
             .attr('stroke-width', 3.5).attr('stroke-linecap', 'round').attr('stroke-linejoin', 'round')
             .attr('d', d3.line().x((d) => x(d.distance)).y((d) => y(d.elevation)).curve(d3.curveMonotoneX));
 
-        svg.selectAll('.waypoint-marker').data(waypoints).enter().append('circle')
-            .attr('class', 'waypoint-marker')
-            .attr('cx', (wp) => x(wp.point.distance))
-            .attr('cy', (wp) => y(wp.point.elevation))
-            .attr('r', narrow ? 4 : 5)
-            .attr('fill', terrain)
-            .attr('stroke', C.waypoint)
-            .attr('stroke-width', 2.5);
+        // The same symbols as on the map, sitting on the profile line
+        const marks = svg.append('g').attr('class', 'profile-stops');
+        const k = narrow ? 1.3 : 1.5; // symbols a bit bigger here than on the map
+        for (const s of stops) {
+            const p = data[s.index];
+            const size = stopSize(s.kind) * k;
+            const g = marks.append('g')
+                .attr('transform', `translate(${x(p.distance) - size / 2},${y(p.elevation) - size / 2}) scale(${k})`)
+                .html(stopSvg(s.kind));
+            g.append('title').text(s.name);
+            if (s.kind === 'peak') {
+                marks.append('text').attr('class', 'profile-peak-label')
+                    .attr('x', Math.min(Math.max(x(p.distance), 60), width - 60)).attr('y', y(p.elevation) - 15)
+                    .attr('text-anchor', 'middle').text(s.name);
+            }
+        }
 
         svg.append('g').attr('class', 'x-axis').attr('transform', `translate(0,${height})`)
             .call(d3.axisBottom(x).ticks(narrow ? 4 : 8).tickSizeOuter(0).tickFormat((d) => `${d} ${distUnit()}`));
@@ -137,7 +162,7 @@ export function renderMapAndElevation(hike) {
         hoverGroup.append('line').attr('y1', 0).attr('y2', height)
             .attr('stroke', C.hoverLine).attr('stroke-width', 1.5).attr('stroke-dasharray', '4 4');
         const hoverDot = hoverGroup.append('circle').attr('r', 6)
-            .attr('fill', C.markerLight).attr('stroke', C.markerDark).attr('stroke-width', 2);
+            .attr('fill', C.markerLight).attr('stroke', C.trail).attr('stroke-width', 2.5);
 
         const onMove = (event) => {
             const [px] = d3.pointer(event);
@@ -200,9 +225,8 @@ export function renderMapAndElevation(hike) {
 
         tooltip.replaceChildren(
             ...(nearby ? [el('div', { className: 'tooltip-waypoint', textContent: nearby.name })] : []),
-            el('strong', { textContent: `${point.elevation.toFixed(0)} ${elevUnit()}` }),
-            el('br'),
-            `${point.distance.toFixed(2)} ${distUnit()}`,
+            el('div', { className: 'tooltip-elev', textContent: `${Math.round(point.elevation).toLocaleString('en')} ${elevUnit()}` }),
+            el('div', { className: 'tooltip-meta', textContent: `${point.distance.toFixed(1)} ${distUnit()} · ${gradeText(point)}` }),
         );
         tooltip.style.opacity = 1;
         tooltip.style.left = `${pageX}px`;

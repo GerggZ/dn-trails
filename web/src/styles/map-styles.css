@@ -1,0 +1,53 @@
+/* Map looks: recolor the map tiles only (trail, markers and location dot keep their colors).
+   One class per look: .map-style-<name>. Try them all on http://127.0.0.1:5180/map-test.html
+   (every .map-style-… class in this file shows up there automatically).
+
+   filter:   grayscale / sepia / saturate / hue-rotate / contrast / brightness / invert
+   opacity:  lower = more of the paper color behind the map shows through */
+
+.map-style-original .leaflet-tile-pane { }
+
+/* Sunset wash: warm pink-peach, matches the page */
+.map-style-sunset .leaflet-tile-pane {
+    filter: grayscale(1) sepia(0.55) hue-rotate(-45deg) saturate(1.5) contrast(0.9) brightness(1.05);
+    opacity: 0.85;
+}
+
+/* Soft dusk: the topo colors kept, but faded and pushed toward mauve */
+.map-style-dusk .leaflet-tile-pane {
+    filter: saturate(0.45) hue-rotate(-35deg) contrast(0.88) brightness(1.06);
+    opacity: 0.8;
+}
+
+/* Park: like a printed national-park map – faded, warm, a little yellowed paper */
+.map-style-park .leaflet-tile-pane {
+    filter: saturate(0.4) sepia(0.35) contrast(0.95) brightness(1.03);
+    opacity: 0.9;
+}
+
+/* Stone: topo colors calmed down to warm neutrals, no pink (works with any page color) */
+.map-style-stone .leaflet-tile-pane {
+    filter: saturate(0.5) sepia(0.15) contrast(0.92) brightness(1.04);
+    opacity: 0.88;
+}
+
+/* Ink on paper: grayscale contours and shading, like a printed book map */
+.map-style-ink .leaflet-tile-pane {
+    filter: grayscale(1) contrast(1.15) brightness(1.05);
+    opacity: 0.7;
+}
+
+/* Blush: barely-there map, the trail does all the talking */
+.map-style-blush .leaflet-tile-pane {
+    filter: grayscale(1) contrast(0.8) brightness(1.15);
+    opacity: 0.45;
+}
+
+/* Night: dark map */
+.map-style-night .leaflet-tile-pane {
+    filter: invert(1) hue-rotate(180deg) grayscale(0.5) brightness(0.85) contrast(0.95);
+}
+
+/* The paper the map is "printed" on (shows through where opacity < 1) */
+[class*='map-style-'] .leaflet-container,
+.leaflet-container[class*='map-style-'] { background: var(--paper); }

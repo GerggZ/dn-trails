@@ -9,8 +9,10 @@ import { renderBackdrop } from './lib/backdrop.js';
 import { scenery } from './lib/scenery.js';
 import { APP_CONFIG } from './config.js';
 import { registerServiceWorker, setupInstallButton } from './lib/pwa.js';
+import { watchForUpdates } from './lib/version.js';
 
 registerServiceWorker();
+watchForUpdates();
 setupInstallButton(document.getElementById('install'), document.getElementById('install-hint'));
 
 const grid = document.getElementById('hike-grid');

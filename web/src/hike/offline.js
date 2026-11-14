@@ -5,8 +5,8 @@
 // copies are picked up automatically. Only shown in the built, installed-able
 // site (the service worker isn't active in `npm run dev`).
 
-import { APP_CONFIG } from '../config.js';
 import { asset } from '../lib/data.js';
+import { currentLayer, tileUrl } from '../lib/map-layers.js';
 
 const MAX_TILES = 900;        // per hike; plenty for a day hike up to zoom 16
 const TOP_ZOOM = 16;
@@ -25,13 +25,14 @@ function tileXY(lat, lon, z) {
     return [x, y];
 }
 
-/** Tile URLs covering the hike (with a margin), from a wide view down to TOP_ZOOM. */
+/** Tile URLs of the map the reader has selected, covering the hike (with a margin), from a wide view down to TOP_ZOOM. */
 function tileUrls(bbox) {
+    const layer = currentLayer();
     const [[s, w], [n, e]] = bbox;
     const padLat = (n - s) * 0.25 + 0.005;
     const padLon = (e - w) * 0.25 + 0.005;
     const [S, W, N, E] = [s - padLat, w - padLon, n + padLat, e + padLon];
-    const top = Math.min(TOP_ZOOM, APP_CONFIG.mapTiles.maxZoom);
+    const top = Math.min(TOP_ZOOM, layer.maxZoom);
 
     for (let maxZ = top; maxZ >= 10; maxZ--) {
         const urls = [];
@@ -40,7 +41,7 @@ function tileUrls(bbox) {
             const [x2, y2] = tileXY(S, E, z);
             for (let x = x1; x <= x2; x++) {
                 for (let y = y1; y <= y2; y++) {
-                    urls.push(tileKey(APP_CONFIG.mapTiles.url.replace('{s}', 'a').replace('{z}', z).replace('{x}', x).replace('{y}', y)));
+                    urls.push(tileKey(tileUrl(layer, z, x, y)));
                 }
             }
         }

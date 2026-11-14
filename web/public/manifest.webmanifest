@@ -5,8 +5,8 @@
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#F0D6E0",
-  "theme_color": "#FA9F95",
+  "background_color": "#E9ECDA",
+  "theme_color": "#E9ECDA",
   "icons": [
     { "src": "icons/dn-icon-192.png", "sizes": "192x192", "type": "image/png" },
     { "src": "icons/dn-icon-512.png", "sizes": "512x512", "type": "image/png" },

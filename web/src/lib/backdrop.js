@@ -32,7 +32,7 @@ function photoBackdrop(src) {
 function mapBackdrop(bbox) {
     const holder = el('div', { className: 'backdrop-map' });
     const layer = mount(holder);
-    const tiles = APP_CONFIG.mapTiles;
+    const tiles = APP_CONFIG.mapLayers[0];
 
     const map = L.map(holder, {
         zoomControl: false, attributionControl: false, dragging: false, scrollWheelZoom: false,
