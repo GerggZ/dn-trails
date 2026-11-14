@@ -129,6 +129,20 @@ location still works there.
 After a big change, bump `VERSION` at the top of `web/public/sw.js` so
 everyone's app picks up the new pages.
 
+## Publishing (GitHub Pages, for now)
+
+```powershell
+cd web
+npm run deploy     # runs build_hikes.py + vite build, then pushes web\dist\ to the gh-pages branch
+```
+
+The site appears at https://gerggz.github.io/dn-trails/ (GitHub serves the
+`gh-pages` branch; `main` stays the source). One-time setup: `npm install` in
+`web\`, the `dn-trails` repo set to **public** (free accounts only get Pages for
+public repos), and in the repo's Settings → Pages: *Deploy from a branch* →
+`gh-pages` / `(root)`. Everything on the site is public, so this is a temporary
+home until private photos need Cloudflare Pages + Access.
+
 ## Old experiments
 
 The earlier prototypes are in `..\HikingBookTests` (tests, tests_02, tests_03).
