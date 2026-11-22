@@ -67,6 +67,11 @@ export const APP_CONFIG = {
         hoverLine: 'rgba(43, 36, 28, 0.45)',
     },
 
+    // Zoomed-in elevation profile (full-screen map): how visible the rest of the
+    // trail stays on the map, so the stretch you're looking at stands out.
+    // 0 = hidden, 1 = no fading
+    trailOutsideView: 0.3,
+
     // Names next to the stop symbols on the map: 'always', or 'hover' (only when you point at one)
     stopNames: 'always',
 

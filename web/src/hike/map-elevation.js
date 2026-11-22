@@ -120,10 +120,12 @@ export function renderMapAndElevation(hike) {
 
     // The trail: one solid line, like on a printed park map (optional light edge underneath)
     const latlngs = data.map((d) => [d.lat, d.lon]);
-    if (C.trailCasing) {
-        L.polyline(latlngs, { color: C.trailCasing, weight: 8, opacity: 0.9, lineCap: 'round', lineJoin: 'round', interactive: false }).addTo(map);
-    }
-    L.polyline(latlngs, { color: C.trail, weight: 4, opacity: 1, lineCap: 'round', lineJoin: 'round', interactive: false }).addTo(map);
+    const casingLine = C.trailCasing
+        ? L.polyline(latlngs, { color: C.trailCasing, weight: 8, opacity: 0.9, lineCap: 'round', lineJoin: 'round', interactive: false }).addTo(map)
+        : null;
+    const trailLine = L.polyline(latlngs, { color: C.trail, weight: 4, opacity: 1, lineCap: 'round', lineJoin: 'round', interactive: false }).addTo(map);
+    // The stretch shown on the zoomed-in profile, drawn over the faded rest of the trail (section 4)
+    const stretchLine = L.polyline([], { color: C.trail, weight: 5, opacity: 1, lineCap: 'round', lineJoin: 'round', interactive: false }).addTo(map);
 
     // Trailhead, end, highest point and stops as map symbols (src/lib/stops.js), with their names
     const stops = stopsFor(hike, (m) => `${Math.round(elev(m)).toLocaleString('en')} ${elevUnit()}`);
@@ -170,6 +172,32 @@ export function renderMapAndElevation(hike) {
         const changed = start !== view[0] || start + span !== view[1];
         view = [start, start + span];
         return changed;
+    }
+
+    // On the map: zoomed in, the rest of the trail fades and the visible stretch
+    // stays solid (cut exactly at the profile's edges). Not zoomed: one plain line.
+    const DIM = APP_CONFIG.trailOutsideView ?? 0.3;
+    let dimmed = false;
+    const latLngAt = (d) => {
+        const i = Math.min(Math.max(bisect.right(data, d), 1), data.length - 1);
+        const a = data[i - 1], b = data[i];
+        const f = b.distance > a.distance ? Math.min(Math.max((d - a.distance) / (b.distance - a.distance), 0), 1) : 0;
+        return [a.lat + (b.lat - a.lat) * f, a.lon + (b.lon - a.lon) * f];
+    };
+    function showStretch() {
+        const zoomed = isZoomed();
+        if (zoomed !== dimmed) {
+            dimmed = zoomed;
+            trailLine.setStyle({ opacity: zoomed ? DIM : 1 });
+            casingLine?.setStyle({ opacity: zoomed ? 0.9 * DIM : 0.9 });
+        }
+        if (!zoomed) {
+            if (stretchLine.getLatLngs().length) stretchLine.setLatLngs([]);
+            return;
+        }
+        const i0 = bisect.right(data, view[0]);
+        const i1 = bisect.left(data, view[1]);
+        stretchLine.setLatLngs([latLngAt(view[0]), ...latlngs.slice(i0, i1), latLngAt(view[1])]);
     }
 
     const [minElev, maxElev] = d3.extent(data, (d) => d.elevation);
@@ -302,6 +330,7 @@ export function renderMapAndElevation(hike) {
 
             // "Whole hike" only when part of the hike is hidden
             document.querySelector('.profile-reset')?.toggleAttribute('hidden', !zoomed);
+            showStretch();
             keepDotInView();
             placeHover();
             placeYou();
