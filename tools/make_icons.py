@@ -65,8 +65,8 @@ def icon(shape: Image.Image, size: int, color: str, background: str | None, fill
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--color", default="#202845", help="logo color on the home-screen icons")
-    ap.add_argument("--background", default="#FFB892,#FA9F95,#CF9096",
+    ap.add_argument("--color", default="#2B3320", help="logo color on the home-screen icons")
+    ap.add_argument("--background", default="#EEF0E2,#E3E6D2,#D3D8BE",
                     help="background of the home-screen icons: one color, or a comma-separated gradient (top to bottom)")
     ap.add_argument("--tab-color", default="#8A8A8A", help="logo color in the browser tab (grey shows on light and dark tabs)")
     args = ap.parse_args()

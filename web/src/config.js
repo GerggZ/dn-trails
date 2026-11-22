@@ -71,14 +71,19 @@ export const APP_CONFIG = {
     stopNames: 'always',
 
     // Slope (%) -> color of the elevation profile line. Values in between are blended.
-    // 'soft' or 'park' (compare them on map-test.html in `npm run dev`).
-    slopeScheme: 'soft',
+    // 'warm', 'soft' or 'park' (compare them on map-test.html in `npm run dev`).
+    slopeScheme: 'warm',
     slopeSchemes: {
+        // Warm, no pink: sage → mustard → orange → burnt orange → dark rust brown
+        warm: [[0, '#8FAE7E'], [6, '#D9B44A'], [12, '#E0892B'], [20, '#B8501C'], [30, '#6B3014']],
         // Softened traffic light: sage → mustard → terracotta → brick → oxblood
         soft: [[0, '#8FAE7E'], [6, '#D9B85C'], [12, '#D98A5B'], [20, '#C4473D'], [30, '#6E2230']],
         // Printed map: sage → ochre → rust → brick → dark brown
         park: [[0, '#8A9A6B'], [6, '#C9A55A'], [12, '#B9733A'], [20, '#8C2F1B'], [30, '#4A2A1C']],
     },
+    // How gently the profile line changes color: the steepness is averaged over
+    // this fraction of the hike (0.01 = sharp, 0.03 = smooth, 0.06 = very smooth)
+    slopeSmoothing: 0.03,
     get slopeColors() { return this.slopeSchemes[this.slopeScheme] ?? this.slopeSchemes.soft; },
 
     // How strongly the hover snaps onto nearby waypoints (fraction of total distance)

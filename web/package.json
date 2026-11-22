@@ -6,6 +6,7 @@
   "scripts": {
     "data": "python ../tools/build_hikes.py",
     "dev": "vite --host 127.0.0.1 --port 5180 --strictPort",
+    "dev:phone": "vite --host --port 5180 --strictPort",
     "build": "vite build",
     "preview": "vite preview --host 127.0.0.1 --port 4180 --strictPort",
     "predeploy": "npm run data && npm run build",

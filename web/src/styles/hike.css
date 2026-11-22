@@ -176,14 +176,31 @@
 /* --- Your location --- */
 /* (the map buttons themselves are styled in map-controls.css) */
 
+/* A quiet note in the book's colors; the small blue dot ties it to "you" on the map */
 .you-status {
+    display: flex;
+    align-items: center;
+    gap: 9px;
     margin: 10px 0 0;
-    padding: 8px 14px;
-    border-radius: 10px;
-    background: color-mix(in srgb, #2A7FFF 14%, transparent);
-    border-left: 4px solid #2A7FFF;
-    font-size: var(--step--1);
+    padding: 7px 12px;
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--paper) 70%, transparent);
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--accent);
+    color: var(--ink);
+    font-family: var(--font-sign);
+    font-size: var(--step-0);
 }
+.you-status::before {
+    content: '';
+    flex: none;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: #2A7FFF;
+    box-shadow: 0 0 0 2px #FFF;
+}
+.you-status[hidden] { display: none; }
 
 .you-marker line { stroke: #2A7FFF; stroke-width: 2; stroke-dasharray: 3 3; }
 .you-marker circle { fill: #2A7FFF; stroke: #FFF; stroke-width: 3; }
@@ -197,3 +214,100 @@
     margin-top: 16px;
 }
 .offline-status { font-size: var(--step--1); color: var(--ink-soft); }
+
+/* --- Full-screen map with the profile docked underneath (like Komoot) --- */
+/* Phones: the map on the page is a preview; a tap opens the full-screen view.
+   Only the full-screen button shows on it; the page scrolls over it. */
+#map-container.map-peek { cursor: pointer; touch-action: pan-y; }
+#map-container.map-peek .leaflet-control:not(.full-control):not(.leaflet-control-attribution) { display: none; }
+
+.full-control .full-button svg { display: block; }
+
+html.map-open, html.map-open body { overflow: hidden; }
+
+.map-full {
+    position: fixed;
+    inset: 0;
+    z-index: 950; /* under the readout (#tooltip, 1000) */
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    height: 100dvh;
+    background: var(--paper);
+}
+.map-full[hidden] { display: none; }
+
+.map-full #map-container {
+    flex: 1 1 auto;
+    height: auto;
+    min-height: 0;
+    border-radius: 0;
+}
+/* Clear of the notch / status bar when installed to the home screen */
+.map-full .leaflet-top { top: env(safe-area-inset-top); }
+
+.map-full-profile {
+    flex: none;
+    padding: 0 max(10px, env(safe-area-inset-right)) max(6px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
+    background: var(--paper);
+    border-top: 1px solid color-mix(in srgb, var(--ink) 22%, transparent);
+    box-shadow: 0 -4px 14px color-mix(in srgb, var(--ink) 14%, transparent);
+}
+.map-full-profile #elevation-container { margin: 0; padding-top: 16px; }
+.map-full-profile #elevation-container svg { touch-action: none; }
+
+/* The hike's total length at the end of the distance axis */
+.tick-end text { fill: var(--ink); font-weight: 600; }
+
+/* "Whole hike": resets the zoomed profile and the map (full-screen view) */
+.map-full-profile { position: relative; }
+.profile-reset {
+    position: absolute;
+    top: 6px;
+    right: max(10px, env(safe-area-inset-right));
+    z-index: 1;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 10px 4px 8px;
+    border: 1px solid var(--ctl-border, color-mix(in srgb, var(--ink) 22%, transparent));
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--paper) 92%, white);
+    color: var(--ink);
+    font-family: var(--font-sign);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+}
+.profile-reset:hover, .profile-reset:focus-visible { color: var(--accent); }
+.map-full-profile #elevation-container { padding-top: 34px; }
+
+/* Grab handle on top of the docked profile (drag to make it taller) */
+.dock-handle {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 96px;
+    height: 22px;
+    z-index: 2;
+    cursor: ns-resize;
+    touch-action: none;
+}
+.dock-handle::before {
+    content: '';
+    position: absolute;
+    top: 7px;
+    left: 50%;
+    width: 38px;
+    height: 4px;
+    margin-left: -19px;
+    border-radius: 2px;
+    background: color-mix(in srgb, var(--ink) 28%, transparent);
+    transition: background-color 0.15s;
+}
+.dock-handle:hover::before,
+.dock-handle.dragging::before { background: color-mix(in srgb, var(--ink) 55%, transparent); }
+.profile-reset[hidden] { display: none; }
+.offline-choices { display: inline-flex; flex-wrap: wrap; gap: 8px; }
+.offline-choices[hidden] { display: none; }

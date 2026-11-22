@@ -8,8 +8,14 @@
 import { asset } from '../lib/data.js';
 import { currentLayer, tileUrl } from '../lib/map-layers.js';
 
-const MAX_TILES = 900;        // per hike; plenty for a day hike up to zoom 16
-const TOP_ZOOM = 16;
+// Two choices for how much map to save. If a hike is too big for the tile
+// limit, the deepest zoom levels are left out until it fits.
+const LEVELS = {
+    standard: { label: 'Standard', topZoom: 16, maxTiles: 900 },   // paths and junctions
+    max: { label: 'Max detail', topZoom: 17, maxTiles: 3000 },     // the most the Park map has
+};
+// Rough size of one map picture per layer (KB), only for the size shown on the buttons
+const TILE_KB = { park: 35, streets: 20, satellite: 30, topo: 22 };
 const PARALLEL = 4;
 
 const savedKey = (id) => `hb-saved-${id}`;
@@ -25,14 +31,14 @@ function tileXY(lat, lon, z) {
     return [x, y];
 }
 
-/** Tile URLs of the map the reader has selected, covering the hike (with a margin), from a wide view down to TOP_ZOOM. */
-function tileUrls(bbox) {
+/** Tile URLs of the map the reader has selected, covering the hike (with a margin), from a wide view down to topZoom. */
+function tileUrls(bbox, { topZoom, maxTiles }) {
     const layer = currentLayer();
     const [[s, w], [n, e]] = bbox;
     const padLat = (n - s) * 0.25 + 0.005;
     const padLon = (e - w) * 0.25 + 0.005;
     const [S, W, N, E] = [s - padLat, w - padLon, n + padLat, e + padLon];
-    const top = Math.min(TOP_ZOOM, layer.maxZoom);
+    const top = Math.min(topZoom, layer.maxZoom);
 
     for (let maxZ = top; maxZ >= 10; maxZ--) {
         const urls = [];
@@ -45,7 +51,7 @@ function tileUrls(bbox) {
                 }
             }
         }
-        if (urls.length <= MAX_TILES) return { urls, maxZ };
+        if (urls.length <= maxTiles) return { urls, maxZ };
     }
     return { urls: [], maxZ: 0 };
 }
@@ -58,23 +64,62 @@ async function runLimited(items, limit, work) {
     await Promise.all(workers);
 }
 
+const fmtMB = (tiles) => {
+    const mb = (tiles * (TILE_KB[currentLayer().id] ?? 30)) / 1024;
+    return mb < 1 ? '< 1 MB' : `≈ ${Math.round(mb)} MB`;
+};
+
+/** What was saved for a hike: { level, maxZ } (older saves only stored a date). */
+function readSaved(id) {
+    try {
+        const raw = localStorage.getItem(savedKey(id));
+        if (raw == null) return null;
+        try { return JSON.parse(raw); } catch { return { level: 'standard' }; }
+    } catch {
+        return null;
+    }
+}
+
 export function setupOfflineSave(hike, button, statusEl) {
     if (!import.meta.env.PROD || !('caches' in window) || !('serviceWorker' in navigator)) return;
 
     const say = (text) => { statusEl.textContent = text; };
 
-    navigator.serviceWorker.ready.then(() => {
-        button.hidden = false;
-        let saved = false;
-        try { saved = localStorage.getItem(savedKey(hike.id)) != null; } catch { /* ignore */ }
-        if (saved) {
-            button.textContent = 'Update offline copy';
-            say('Saved on this device.');
-        }
-    });
+    // "Save for offline" opens the two choices, each with its size
+    const choices = document.createElement('span');
+    choices.className = 'offline-choices';
+    choices.hidden = true;
+    button.after(choices);
 
-    button.addEventListener('click', async () => {
-        button.disabled = true;
+    function showChoices() {
+        const plans = Object.entries(LEVELS).map(([id, level]) => ({ id, level, ...tileUrls(hike.bbox, level) }));
+        // No point offering "Max detail" if it comes out the same (big hike, or a map that stops at 16)
+        const distinct = plans.filter((p, i) => i === 0 || p.maxZ > plans[0].maxZ);
+        choices.replaceChildren(...distinct.map((plan) => {
+            const b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'pill';
+            b.textContent = `${plan.level.label} · ${fmtMB(plan.urls.length)}`;
+            b.addEventListener('click', () => save(plan));
+            return b;
+        }));
+        button.hidden = true;
+        choices.hidden = false;
+        say('');
+    }
+
+    function showSaved(saved) {
+        choices.hidden = true;
+        button.hidden = false;
+        button.textContent = saved ? 'Update offline copy' : 'Save for offline';
+        if (saved) say(`Saved on this device${saved.level === 'max' ? ' (max detail)' : ''}.`);
+    }
+
+    navigator.serviceWorker.ready.then(() => showSaved(readSaved(hike.id)));
+    button.addEventListener('click', showChoices);
+
+    async function save({ id, level, urls, maxZ }) {
+        for (const b of choices.querySelectorAll('button')) b.disabled = true;
         try {
             // The page itself (the service worker keeps a copy of any page it serves)
             await fetch(asset('hike.html')).catch(() => {});
@@ -93,8 +138,7 @@ export function setupOfflineSave(hike, button, statusEl) {
                 say(`Saving photos… ${++done} / ${photoUrls.length}`);
             });
 
-            // Map tiles around the trail
-            const { urls, maxZ } = tileUrls(hike.bbox);
+            // Map tiles around the trail (ones already saved, e.g. from "Standard", are skipped)
             const tiles = await caches.open('hb-tiles');
             let fetched = 0;
             let failed = 0;
@@ -111,15 +155,14 @@ export function setupOfflineSave(hike, button, statusEl) {
                 if (fetched % 10 === 0 || fetched === urls.length) say(`Saving map… ${fetched} / ${urls.length}`);
             });
 
-            try { localStorage.setItem(savedKey(hike.id), new Date().toISOString()); } catch { /* ignore */ }
-            button.textContent = 'Update offline copy';
-            say(failed
-                ? `Saved, but ${failed} map pieces failed. Try again with a better connection.`
-                : `Saved on this device: photos and the map up to zoom level ${maxZ}.`);
+            const saved = { level: id, maxZ, at: new Date().toISOString() };
+            try { localStorage.setItem(savedKey(hike.id), JSON.stringify(saved)); } catch { /* ignore */ }
+            showSaved(saved);
+            if (failed) say(`Saved, but ${failed} map pieces failed. Try again with a better connection.`);
+            else say(`Saved on this device: photos and the map (${level.label.toLowerCase()}).`);
         } catch (err) {
+            showSaved(readSaved(hike.id));
             say(`Couldn't save: ${err.message}`);
-        } finally {
-            button.disabled = false;
         }
-    });
+    }
 }

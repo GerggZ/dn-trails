@@ -41,6 +41,7 @@ npm install
 3. Fill in `hike.json` (see below).
 4. `python tools\build_hikes.py` (or `npm run data` inside `web\`)
 5. `cd web` → `npm run dev` → open http://127.0.0.1:5180
+   - On your phone (same Wi-Fi): `npm run dev:phone` instead, then open the "Network:" address it prints (e.g. http://192.168.1.23:5180). Your location doesn't work there (phones only share it over https).
 
 Rerun step 4 whenever you change a hike. Photos that are already resized are skipped, so it stays fast.
 
