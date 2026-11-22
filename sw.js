@@ -12,13 +12,13 @@
 // new pages, and the saved hike data refreshed. The value here is only used
 // if sw.js is served without building.
 
-const VERSION = "14 Nov 2026, 13:21 · 5b5b791";
+const VERSION = "22 Nov 2026, 17:45 · eeedd4e";
 const PAGES = `hb-pages-${VERSION}`;
 const ASSETS = 'hb-assets';
 const DATA = 'hb-data';
 const PHOTOS = 'hb-photos';
 const TILES = 'hb-tiles';
-const MAX_TILES = 6000;
+const MAX_TILES = 12000; // ≈ 300–400 MB; room for a few hikes saved at "Max detail"
 
 const SCOPE = self.registration.scope; // e.g. https://you.github.io/hiking-book/
 const CORE = ['', 'index.html', 'hike.html', 'manifest.webmanifest', 'data/hikes.json', 'data/backgrounds.json']
