@@ -4,7 +4,7 @@ import './styles/hike.css';
 import './styles/gallery.css';
 
 import { loadHike, asset, el } from './lib/data.js';
-import { fmtDist, fmtElev, fmtDuration, fmtDate } from './lib/units.js';
+import { fmtDist, fmtElev, fmtDuration } from './lib/units.js';
 import { cutOut, resample } from './lib/silhouette.js';
 import { scenery } from './lib/scenery.js';
 import { renderBackdrop } from './lib/backdrop.js';
@@ -33,7 +33,7 @@ function renderHeader(hike) {
     document.title = `${hike.title} – Hiking Book`;
     document.getElementById('title').textContent = hike.title;
     document.getElementById('subtitle').textContent =
-        [fmtDate(hike.date), hike.location].filter(Boolean).join(', ');
+        hike.location || '';
 
     const s = hike.stats;
     const stats = [

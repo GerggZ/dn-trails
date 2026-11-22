@@ -35,6 +35,7 @@
     --page: 1080px;
     --gutter: clamp(18px, 4vw, 40px);
     --radius-sheet: 22px;
+    --sheet-side: clamp(8px, 3vw, 32px); /* photo showing beside the sheet on narrow screens */
     --radius: 12px;
 }
 
@@ -164,6 +165,7 @@ img { display: block; max-width: 100%; }
 
 /* --- The frosted-glass sheet the content sits on --- */
 .sheet {
+    width: calc(100% - 2 * var(--sheet-side));
     max-width: calc(var(--page) + 2 * var(--gutter));
     margin: 0 auto 72px;
     background: var(--glass);
@@ -175,11 +177,11 @@ img { display: block; max-width: 100%; }
     overflow: hidden;
 }
 
+/* Phones: a card on the photo all the way round, with a little photo below it too */
 @media (max-width: 720px) {
     .sheet {
-        border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
-        margin-bottom: 0;
-        border-bottom: 0;
+        --radius-sheet: 18px;
+        margin-bottom: max(var(--sheet-side), env(safe-area-inset-bottom));
     }
 }
 

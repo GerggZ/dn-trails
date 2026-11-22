@@ -491,21 +491,28 @@ export function renderMapAndElevation(hike) {
     // During a gesture it only pans (and zooms out if needed) so it doesn't
     // flicker between zoom levels; when the gesture ends it settles on a good fit.
     const FIT_PAD = 40;
+    // In full screen the profile floats over the bottom of the map: keep the trail above it
+    const dockCover = () => (full ? Math.max(0, overlay.clientHeight - dock.offsetTop) : 0);
+    const fitOpts = (extra = {}) => (full
+        ? { paddingTopLeft: [FIT_PAD, FIT_PAD], paddingBottomRight: [FIT_PAD, FIT_PAD + dockCover()], ...extra }
+        : { padding: [30, 30], ...extra });
     function followMap(final) {
         if (!full) return;
         if (!isZoomed()) {
-            if (final) map.fitBounds(hike.bbox, { padding: [FIT_PAD, FIT_PAD] });
+            if (final) map.fitBounds(hike.bbox, fitOpts());
             return;
         }
         const i0 = bisect.left(data, view[0]);
         const i1 = Math.max(bisect.right(data, view[1]), i0 + 1);
         const bounds = L.latLngBounds(data.slice(i0, i1).map((d) => [d.lat, d.lon]));
         if (final) {
-            map.fitBounds(bounds, { padding: [FIT_PAD, FIT_PAD], maxZoom: 17 });
-        } else if (map.getBoundsZoom(bounds, false, L.point(2 * FIT_PAD, 2 * FIT_PAD)) >= map.getZoom()) {
-            map.panTo(bounds.getCenter(), { animate: false });
+            map.fitBounds(bounds, fitOpts({ maxZoom: 17 }));
+        } else if (map.getBoundsZoom(bounds, false, L.point(2 * FIT_PAD, 2 * FIT_PAD + dockCover())) >= map.getZoom()) {
+            // Centre the stretch in the part of the map above the profile
+            const c = map.project(bounds.getCenter()).add([0, dockCover() / 2]);
+            map.panTo(map.unproject(c), { animate: false });
         } else {
-            map.fitBounds(bounds, { padding: [FIT_PAD, FIT_PAD], animate: false });
+            map.fitBounds(bounds, fitOpts({ animate: false }));
         }
     }
 
@@ -513,7 +520,7 @@ export function renderMapAndElevation(hike) {
     function resetView() {
         view = [0, totalDistance];
         profile.render();
-        map.fitBounds(hike.bbox, { padding: [full ? FIT_PAD : 30, full ? FIT_PAD : 30] });
+        map.fitBounds(hike.bbox, fitOpts());
     }
 
     drawProfile();
@@ -654,7 +661,7 @@ export function renderMapAndElevation(hike) {
         resizeFrame = null;
         drawProfile();
         lastWidth = container.clientWidth;
-        map.invalidateSize({ pan: false });
+        updateCover();
     };
     handle.addEventListener('pointerdown', (event) => {
         resize = { y: event.clientY, extra: dockExtra };
@@ -697,12 +704,17 @@ export function renderMapAndElevation(hike) {
         mapBox.classList.toggle('map-peek', peek());
         if (!full) setInteractive(!compact.matches);
     }
-    function relayout(padding) {
+    function relayout() {
         syncHover(null);
         map.invalidateSize();
-        map.fitBounds(hike.bbox, { padding: [padding, padding] });
         drawProfile();
         lastWidth = container.clientWidth;
+        updateCover();
+        map.fitBounds(hike.bbox, fitOpts());
+    }
+    // Map credit line (bottom right) sits just above the floating profile
+    function updateCover() {
+        overlay.style.setProperty('--dock-cover', `${dockCover()}px`);
     }
 
     function openFull() {
@@ -716,7 +728,7 @@ export function renderMapAndElevation(hike) {
         setInteractive(true);
         refresh();
         history.pushState({ hbMap: true }, ''); // so the back button closes the map
-        relayout(40);
+        relayout();
         fullControl.button.focus({ preventScroll: true });
     }
     function closeFull(fromBackButton = false) {
@@ -728,7 +740,7 @@ export function renderMapAndElevation(hike) {
         overlay.hidden = true;
         document.documentElement.classList.remove('map-open');
         refresh();
-        relayout(30);
+        relayout();
         if (!fromBackButton && history.state?.hbMap) history.back();
     }
     function toggleFull() { if (full) closeFull(); else openFull(); }

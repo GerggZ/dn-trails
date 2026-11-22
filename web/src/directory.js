@@ -3,7 +3,7 @@ import './styles/base.css';
 import './styles/directory.css';
 
 import { loadHikeIndex, asset, el } from './lib/data.js';
-import { fmtDist, fmtElev, fmtDate } from './lib/units.js';
+import { fmtDist, fmtElev } from './lib/units.js';
 import { cutOut } from './lib/silhouette.js';
 import { renderBackdrop } from './lib/backdrop.js';
 import { scenery } from './lib/scenery.js';
@@ -41,7 +41,7 @@ function hikeCard(h) {
     const ridge = cutOut(art, h.profile, { band: 0.45, relief: 0.75 });
     const visual = el('div', { className: 'card-visual' }, art, ridge);
 
-    const when = [fmtDate(h.date), h.location].filter(Boolean).join(', ');
+    const when = h.location || '';
 
     const card = el('a', { href: `./hike.html?id=${encodeURIComponent(h.id)}`, className: 'hike-card' },
         visual,

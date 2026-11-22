@@ -229,8 +229,6 @@ html.map-open, html.map-open body { overflow: hidden; }
     position: fixed;
     inset: 0;
     z-index: 950; /* under the readout (#tooltip, 1000) */
-    display: flex;
-    flex-direction: column;
     height: 100vh;
     height: 100dvh;
     background: var(--paper);
@@ -238,20 +236,35 @@ html.map-open, html.map-open body { overflow: hidden; }
 .map-full[hidden] { display: none; }
 
 .map-full #map-container {
-    flex: 1 1 auto;
-    height: auto;
-    min-height: 0;
+    /* !important: Leaflet puts position: relative on the map as an inline style,
+       which made it 0 px tall here */
+    position: absolute !important;
+    inset: 0;
+    width: 100%;
+    height: 100%;
     border-radius: 0;
 }
+/* Credit line just above the floating profile (set from JS) */
+.map-full .leaflet-bottom { bottom: var(--dock-cover, 0px); }
 /* Clear of the notch / status bar when installed to the home screen */
 .map-full .leaflet-top { top: env(safe-area-inset-top); }
 
+/* The profile floats over the map as a card: not quite full width, rounded corners */
 .map-full-profile {
-    flex: none;
-    padding: 0 max(10px, env(safe-area-inset-right)) max(6px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
-    background: var(--paper);
-    border-top: 1px solid color-mix(in srgb, var(--ink) 22%, transparent);
-    box-shadow: 0 -4px 14px color-mix(in srgb, var(--ink) 14%, transparent);
+    position: absolute;
+    left: 50%;
+    bottom: max(12px, env(safe-area-inset-bottom));
+    transform: translateX(-50%);
+    z-index: 1;
+    width: min(94%, 1000px);
+    box-sizing: border-box;
+    padding: 0 10px 6px;
+    border-radius: 14px;
+    background: color-mix(in srgb, var(--paper) 94%, transparent);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+    border: 1px solid color-mix(in srgb, var(--ink) 16%, transparent);
+    box-shadow: 0 8px 28px color-mix(in srgb, var(--ink) 26%, transparent);
 }
 .map-full-profile #elevation-container { margin: 0; padding-top: 16px; }
 .map-full-profile #elevation-container svg { touch-action: none; }
@@ -260,11 +273,10 @@ html.map-open, html.map-open body { overflow: hidden; }
 .tick-end text { fill: var(--ink); font-weight: 600; }
 
 /* "Whole hike": resets the zoomed profile and the map (full-screen view) */
-.map-full-profile { position: relative; }
 .profile-reset {
     position: absolute;
     top: 6px;
-    right: max(10px, env(safe-area-inset-right));
+    right: 10px;
     z-index: 1;
     display: inline-flex;
     align-items: center;
