@@ -210,11 +210,38 @@
     color: color-mix(in srgb, var(--ink) 70%, transparent);
 }
 .tooltip-elev { font-size: 17px; font-weight: 600; }
+.tooltip-line { white-space: nowrap; }
 .tooltip-meta {
     font-size: 13px;
     color: color-mix(in srgb, var(--ink) 70%, transparent);
     font-variant-numeric: tabular-nums;
 }
+
+/* Under the profile: walked (left, in the bar's fill color) and still to go
+   (right, soft like the bar's empty part). Padding set from JS to match the plot. */
+.profile-progress {
+    margin-top: 2px;
+    font-family: var(--font-sign);
+    font-variant-numeric: tabular-nums;
+}
+.progress-labels {
+    display: flex;
+    gap: 12px;
+    min-height: 1.2em;
+    margin-bottom: 4px;
+    font-size: 14px;
+    line-height: 1.2;
+}
+.progress-labels b { font-weight: 600; }
+.progress-done { color: color-mix(in srgb, var(--accent) 80%, var(--ink)); }
+.progress-left { margin-left: auto; color: var(--ink-soft); }
+.progress-track {
+    height: 5px;
+    border-radius: 3px;
+    overflow: hidden;
+    background: color-mix(in srgb, var(--soft) 35%, transparent);
+}
+.progress-fill { height: 100%; width: 0; background: var(--accent); }
 
 /* Name + height above the ▲ on the elevation profile */
 .profile-peak-label {

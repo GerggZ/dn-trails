@@ -7,6 +7,7 @@ import { dist, elev, distUnit, elevUnit } from '../lib/units.js';
 import { el } from '../lib/data.js';
 import { fmtWalk } from '../lib/units.js';
 import { hasTimes, hoursBetween, hoursToEnd } from '../lib/walking-time.js';
+import { onPaceChange } from '../lib/pace.js';
 import { addMapLayers } from '../lib/map-layers.js';
 import { stopsFor, stopSvg, stopSize } from '../lib/stops.js';
 
@@ -22,15 +23,6 @@ const slopeColor = (() => {
     return (gradePct) => scale(Math.abs(gradePct));
 })();
 
-/** Walking time for the readout: from the start and to the end at the reader's pace. */
-function walkTimes(hike, i) {
-    const done = hoursBetween(hike, 0, i);
-    const left = hoursToEnd(hike, i);
-    if (done * 60 < 2) return `${fmtWalk(left)} to the end`;
-    if (left * 60 < 2) return `${fmtWalk(done)} from the start`;
-    return `${fmtWalk(done)} in · ${fmtWalk(left)} to go`;
-}
-
 /** Steepness at a point for the readout: "+12%", "−8%" or "flat". */
 function gradeText(point) {
     const g = Math.round(point.grade);
@@ -39,7 +31,6 @@ function gradeText(point) {
 
 export function renderMapAndElevation(hike) {
     const t = hike.track;
-    const timeText = (i) => walkTimes(hike, i);
     const totalDistance = dist(t.dist_km[t.dist_km.length - 1]);
 
     // Steepness for the line color, averaged over ~1/120 of the hike so it
@@ -57,8 +48,10 @@ export function renderMapAndElevation(hike) {
     // flickering. The readout keeps the sharper value above.
     const colorGrade = (() => {
         const span = Math.max(t.dist_km[t.dist_km.length - 1] * (APP_CONFIG.slopeSmoothing ?? 0.03), windowKm);
-        // Two passes of a moving average ≈ a soft (triangular) blur
-        let g = smoothGrade;
+        // Two passes of a moving average ≈ a soft (triangular) blur. Averaged as
+        // steepness without direction (abs), so a summit — steep up, steep down —
+        // stays warm instead of averaging out to "flat"
+        let g = smoothGrade.map(Math.abs);
         for (let pass = 0; pass < 2; pass++) {
             const prefix = [0];
             for (const v of g) prefix.push(prefix[prefix.length - 1] + v);
@@ -173,6 +166,31 @@ export function renderMapAndElevation(hike) {
     let youIndex = null; // track point nearest to the reader's location, if known
     let hover = null; // { point, nearby } under the finger / mouse, kept across redraws
 
+    // Under the profile: how far in and how much is left, as a bar. No words –
+    // the walked numbers (left) take the bar's fill color, the rest (right) the
+    // soft color of its empty part. Without a hover: the whole hike still to go.
+    const progDone = el('span', { className: 'progress-done' });
+    const progLeft = el('span', { className: 'progress-left' });
+    const progFill = el('div', { className: 'progress-fill' });
+    const progress = el('div', { className: 'profile-progress' },
+        el('div', { className: 'progress-labels' }, progDone, progLeft),
+        el('div', { className: 'progress-track' }, progFill),
+    );
+    container.after(progress);
+    function updateProgress(point) {
+        const d = point ? point.distance : 0;
+        const i = point ? point.index : 0;
+        const label = (distance, hours) => [
+            el('b', { textContent: `${Math.max(0, distance).toFixed(1)} ${distUnit()}` }),
+            hasTimes(hike) && hours * 60 >= 2.5 ? ` · ${fmtWalk(hours)}` : null,
+        ];
+        progDone.replaceChildren(...(point ? label(d, hasTimes(hike) ? hoursBetween(hike, 0, i) : 0) : []));
+        progLeft.replaceChildren(...label(totalDistance - d, hasTimes(hike) ? hoursToEnd(hike, i) : 0));
+        progFill.style.width = `${totalDistance > 0 ? (100 * d) / totalDistance : 0}%`;
+    }
+    updateProgress(null);
+    onPaceChange(() => updateProgress(hover?.point));
+
     // The stretch of the hike that's visible, in display units
     let view = [0, totalDistance];
     let dockExtra = 0; // px the docked profile was dragged taller (section 6)
@@ -223,6 +241,7 @@ export function renderMapAndElevation(hike) {
         const narrow = outerWidth < 560;
         const margin = { top: 12, right: 8, bottom: 30, left: narrow ? 46 : 56 };
         const width = outerWidth - margin.left - margin.right;
+        progress.style.padding = `0 ${margin.right}px 0 ${margin.left}px`; // bar spans the plot, not the axis labels
         // Shorter when docked under the full-screen map, so the map gets the room
         // (the reader can drag it taller with the handle on top, section 6)
         const outerHeight = full ? (narrow ? 150 : 180) + dockExtra : (narrow ? 190 : 230);
@@ -603,6 +622,7 @@ export function renderMapAndElevation(hike) {
             mapHoverDot.setStyle({ opacity: 0, fillOpacity: 0 });
             profile.placeHover();
             tooltip.style.opacity = 0;
+            updateProgress(null);
             return;
         }
 
@@ -616,10 +636,12 @@ export function renderMapAndElevation(hike) {
 
         tooltip.replaceChildren(
             ...(nearby ? [el('div', { className: 'tooltip-waypoint', textContent: nearby.name })] : []),
-            el('div', { className: 'tooltip-elev', textContent: `${Math.round(point.elevation).toLocaleString('en')} ${elevUnit()}` }),
-            el('div', { className: 'tooltip-meta', textContent: `${point.distance.toFixed(1)} ${distUnit()} · ${gradeText(point)}` }),
-            ...(hasTimes(hike) ? [el('div', { className: 'tooltip-meta tooltip-time', textContent: timeText(point.index) })] : []),
+            el('div', { className: 'tooltip-line' },
+                el('span', { className: 'tooltip-elev', textContent: `${Math.round(point.elevation).toLocaleString('en')} ${elevUnit()}` }),
+                el('span', { className: 'tooltip-meta', textContent: ` · ${gradeText(point)}` }),
+            ),
         );
+        updateProgress(point);
         tooltip.style.opacity = 1;
         tooltip.style.left = `${pageX}px`;
         tooltip.style.top = `${pageY - (touch ? 48 : 16)}px`; // above the finger, not under it
@@ -787,7 +809,7 @@ export function renderMapAndElevation(hike) {
         full = true;
         dockExtra = Math.min(dockExtra, maxExtra());
         overlay.prepend(mapBox);
-        dock.append(container);
+        dock.append(container, progress);
         overlay.hidden = false;
         document.documentElement.classList.add('map-open');
         setInteractive(true);
@@ -801,7 +823,7 @@ export function renderMapAndElevation(hike) {
         full = false;
         view = [0, totalDistance]; // the page always shows the whole hike
         terrainBox.insertBefore(mapBox, statusEl);
-        statusEl.after(container);
+        statusEl.after(container, progress);
         overlay.hidden = true;
         document.documentElement.classList.remove('map-open');
         refresh();
