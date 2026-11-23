@@ -12,7 +12,7 @@
 // new pages, and the saved hike data refreshed. The value here is only used
 // if sw.js is served without building.
 
-const VERSION = "23 Nov 2026, 01:03 · 038b483";
+const VERSION = "23 Nov 2026, 17:28 · eca49a7";
 const PAGES = `hb-pages-${VERSION}`;
 const ASSETS = 'hb-assets';
 const DATA = 'hb-data';
