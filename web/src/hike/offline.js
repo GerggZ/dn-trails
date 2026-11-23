@@ -4,7 +4,12 @@
 // Uses the same caches as the service worker (public/sw.js), so the saved
 // copies are picked up automatically. Only shown in the built, installed-able
 // site (the service worker isn't active in `npm run dev`).
+//
+// "Remove" takes a hike's photos and map tiles off the device again. Tiles are
+// one shared pile (neighbouring hikes overlap), so tiles another saved hike
+// still needs are kept.
 
+import { APP_CONFIG } from '../config.js';
 import { asset } from '../lib/data.js';
 import { currentLayer, tileUrl } from '../lib/map-layers.js';
 

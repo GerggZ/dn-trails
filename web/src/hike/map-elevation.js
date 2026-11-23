@@ -5,6 +5,8 @@ import 'leaflet/dist/leaflet.css';
 import { APP_CONFIG } from '../config.js';
 import { dist, elev, distUnit, elevUnit } from '../lib/units.js';
 import { el } from '../lib/data.js';
+import { fmtWalk } from '../lib/units.js';
+import { hasTimes, hoursBetween, hoursToEnd } from '../lib/walking-time.js';
 import { addMapLayers } from '../lib/map-layers.js';
 import { stopsFor, stopSvg, stopSize } from '../lib/stops.js';
 
@@ -20,6 +22,15 @@ const slopeColor = (() => {
     return (gradePct) => scale(Math.abs(gradePct));
 })();
 
+/** Walking time for the readout: from the start and to the end at the reader's pace. */
+function walkTimes(hike, i) {
+    const done = hoursBetween(hike, 0, i);
+    const left = hoursToEnd(hike, i);
+    if (done * 60 < 2) return `${fmtWalk(left)} to the end`;
+    if (left * 60 < 2) return `${fmtWalk(done)} from the start`;
+    return `${fmtWalk(done)} in · ${fmtWalk(left)} to go`;
+}
+
 /** Steepness at a point for the readout: "+12%", "−8%" or "flat". */
 function gradeText(point) {
     const g = Math.round(point.grade);
@@ -28,6 +39,7 @@ function gradeText(point) {
 
 export function renderMapAndElevation(hike) {
     const t = hike.track;
+    const timeText = (i) => walkTimes(hike, i);
     const totalDistance = dist(t.dist_km[t.dist_km.length - 1]);
 
     // Steepness for the line color, averaged over ~1/120 of the hike so it
@@ -61,6 +73,7 @@ export function renderMapAndElevation(hike) {
 
     // --- 1. FORMAT DATA (converted to the display units once) ---
     const data = t.dist_km.map((d, i) => ({
+        index: i,
         distance: dist(d),
         elevation: elev(t.ele_m[i]),
         lat: t.lat[i],
@@ -483,16 +496,38 @@ export function renderMapAndElevation(hike) {
                 if (event.pointerType === 'mouse' && !event.buttons) { scrub = null; syncHover(null); }
             });
 
-        // Mouse wheel / trackpad in the full-screen view: zoom around the pointer, sideways to move
+        // Mouse wheel / trackpad in the full-screen view, zooming around the pointer:
+        //   trackpad pinch (the browser sends it as wheel + ctrlKey) → zoom, fast enough to feel direct
+        //   scroll up/down (mouse wheel or two fingers)            → zoom
+        //   two fingers sideways (or shift + wheel)                → move along the hike
+        // A trackpad swipe is locked to its main direction, so a slightly diagonal
+        // swipe doesn't zoom and move at the same time.
+        const PINCH_SPEED = 0.012;
+        const SCROLL_SPEED = 0.0025;
         let wheelTimer = null;
         overlay.node().addEventListener('wheel', (event) => {
             if (!full) return;
             event.preventDefault();
+            // Lines / pages (some mice, Firefox) → pixels
+            const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? height : 1;
+            let dx = event.deltaX * unit;
+            let dy = event.deltaY * unit;
+            if (event.shiftKey && !dx) { dx = dy; dy = 0; } // shift + wheel = sideways
+            let zoomBy = 0;
+            if (event.ctrlKey) {
+                zoomBy = dy * PINCH_SPEED;
+                dx = 0;
+            } else if (Math.abs(dx) > Math.abs(dy)) {
+                dy = 0;
+            } else {
+                zoomBy = dy * SCROLL_SPEED;
+                dx = 0;
+            }
             const [px] = d3.pointer(event);
             const span = view[1] - view[0];
             const at = x.invert(px);
-            const newSpan = span * Math.exp(event.deltaY * 0.0015);
-            const start = at - (px / width) * newSpan + (event.deltaX / width) * span;
+            const newSpan = span * Math.exp(Math.max(-0.5, Math.min(0.5, zoomBy)));
+            const start = at - (px / width) * newSpan + (dx / width) * span;
             setView(start, start + newSpan);
             render();
             followMap(false);
@@ -583,6 +618,7 @@ export function renderMapAndElevation(hike) {
             ...(nearby ? [el('div', { className: 'tooltip-waypoint', textContent: nearby.name })] : []),
             el('div', { className: 'tooltip-elev', textContent: `${Math.round(point.elevation).toLocaleString('en')} ${elevUnit()}` }),
             el('div', { className: 'tooltip-meta', textContent: `${point.distance.toFixed(1)} ${distUnit()} · ${gradeText(point)}` }),
+            ...(hasTimes(hike) ? [el('div', { className: 'tooltip-meta tooltip-time', textContent: timeText(point.index) })] : []),
         );
         tooltip.style.opacity = 1;
         tooltip.style.left = `${pageX}px`;

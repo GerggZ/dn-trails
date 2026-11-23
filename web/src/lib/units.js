@@ -32,3 +32,13 @@ export function fmtDate(iso) {
         ? iso
         : d.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
 }
+
+/** An estimate: rounded to 5 minutes ("45 min", "4h 05m"). */
+export function fmtWalk(hours) {
+    if (hours == null || !Number.isFinite(hours)) return null;
+    const total = Math.max(5, Math.round((hours * 60) / 5) * 5);
+    const h = Math.floor(total / 60);
+    const m = total % 60;
+    if (h === 0) return `${m} min`;
+    return `${h}h ${String(m).padStart(2, '0')}m`;
+}

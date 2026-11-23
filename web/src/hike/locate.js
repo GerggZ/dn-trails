@@ -8,7 +8,9 @@
 
 import L from 'leaflet';
 
-import { fmtDist, fmtElev } from '../lib/units.js';
+import { fmtDist, fmtElev, fmtWalk } from '../lib/units.js';
+import { onPaceChange } from '../lib/pace.js';
+import { hasTimes, hoursToEnd } from '../lib/walking-time.js';
 
 const REMEMBER_KEY = 'hb-locate-on';
 const ON_TRAIL_M = 120;      // closer than this (plus GPS accuracy) counts as "on the trail"
@@ -68,6 +70,7 @@ export function setupLocate(hike, { map, showOnProfile }, statusEl) {
     let ring = null;
     let firstFix = true;
     let button = null;
+    let lastPos = null;
 
     const say = (text) => {
         statusEl.hidden = !text;
@@ -75,6 +78,7 @@ export function setupLocate(hike, { map, showOnProfile }, statusEl) {
     };
 
     function onPosition(pos) {
+        lastPos = pos;
         const { latitude: lat, longitude: lon, accuracy } = pos.coords;
         const here = [lat, lon];
 
@@ -92,7 +96,9 @@ export function setupLocate(hike, { map, showOnProfile }, statusEl) {
 
         if (offM <= ON_TRAIL_M + Math.min(accuracy, 200)) {
             const climbLeft = ascent[ascent.length - 1] - ascent[i];
-            say(`You're on the trail: ${fmtDist(alongKm)} in, ${fmtDist(totalKm - alongKm)} to go`
+            const hoursLeft = hasTimes(hike) ? hoursToEnd(hike, i) : null;
+            const timeLeft = hoursLeft != null && hoursLeft * 60 >= 2 ? ` (about ${fmtWalk(hoursLeft)} of walking)` : '';
+            say(`You're on the trail: ${fmtDist(alongKm)} in, ${fmtDist(totalKm - alongKm)} to go${timeLeft}`
                 + (climbLeft >= 10 ? `, about ${fmtElev(climbLeft)} of climbing left.` : '.'));
             showOnProfile(i);
         } else if (offM <= NEAR_TRAIL_M) {
@@ -139,6 +145,7 @@ export function setupLocate(hike, { map, showOnProfile }, statusEl) {
     function stop() {
         if (watchId != null) navigator.geolocation.clearWatch(watchId);
         watchId = null;
+        lastPos = null;
         dot?.remove(); ring?.remove();
         dot = ring = null;
         showOnProfile(null);
@@ -172,6 +179,9 @@ export function setupLocate(hike, { map, showOnProfile }, statusEl) {
         },
     });
     map.addControl(new LocateControl());
+
+    // Pace slider moved: say the time left again
+    onPaceChange(() => { if (watchId != null && lastPos) onPosition(lastPos); });
 
     // Turned on last time and still allowed? Start right away.
     let remembered = false;

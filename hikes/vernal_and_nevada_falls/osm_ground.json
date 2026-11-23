@@ -1,0 +1,102 @@
+{
+ "source": "© OpenStreetMap contributors (ODbL), via Overpass API",
+ "fetched": "2026-11-23",
+ "match_radius_m": 50.0,
+ "track": {
+  "points": 602,
+  "first": [
+   37.73783,
+   -119.57231
+  ],
+  "last": [
+   37.73783,
+   -119.57231
+  ]
+ },
+ "ground": [
+  [
+   0,
+   "paved"
+  ],
+  [
+   20,
+   "path"
+  ],
+  [
+   36,
+   "paved"
+  ],
+  [
+   37,
+   "path"
+  ],
+  [
+   38,
+   "paved"
+  ],
+  [
+   39,
+   "path"
+  ],
+  [
+   42,
+   "paved"
+  ],
+  [
+   45,
+   "path"
+  ],
+  [
+   46,
+   "paved"
+  ],
+  [
+   116,
+   "path"
+  ],
+  [
+   182,
+   "paved"
+  ],
+  [
+   184,
+   "path"
+  ],
+  [
+   488,
+   "paved"
+  ],
+  [
+   557,
+   "path"
+  ],
+  [
+   558,
+   "paved"
+  ],
+  [
+   560,
+   "path"
+  ],
+  [
+   563,
+   "paved"
+  ],
+  [
+   564,
+   "path"
+  ],
+  [
+   565,
+   "paved"
+  ],
+  [
+   566,
+   "path"
+  ],
+  [
+   582,
+   "paved"
+  ]
+ ]
+}

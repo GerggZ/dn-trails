@@ -10,10 +10,12 @@ HikingBook/
       track.gpx           route (komoot export works fine)
       hike.json           title, date, description, captions, …
       photos/             original photos (jpg/png/webp, any size)
+      osm_ground.json     ground type along the trail (made by fetch_osm.py)
   backgrounds/            photos used as the blurred page background
   tools/                  ← Python: turns hikes/ into website data
     build_hikes.py
     new_hike.py
+    fetch_osm.py          ground type (paved / path / off-trail) from OpenStreetMap
     hikebook/             gpx reading, metrics, photo resizing
   web/                    ← Vite website (the ebook itself)
     index.html            list of all hikes
@@ -72,9 +74,27 @@ Rerun step 4 whenever you change a hike. Photos that are already resized are ski
 | `cover` | your main photo for this hike (header, index card and page background); empty → a generated landscape drawn from the hike's elevation profile |
 | `captions` | keyed by photo filename; photos without one just have no caption |
 | `draft` | `true` hides the hike from the book |
+| `ground` | optional. `"auto"` (default) = ground type from OpenStreetMap; `"paved"`, `"path"` or `"offtrail"` = use that for the whole hike |
 
-Distance, ascent/descent, highest point and duration are calculated from
-the GPX, so you never type them by hand.
+Distance, ascent/descent and highest point are calculated from the GPX, so
+you never type them by hand.
+
+## Walking time
+
+The book estimates the walking time (moving time, no breaks) with the model
+from Wood et al. 2023, *Improved prediction of hiking speeds using a data
+driven approach* (PLOS ONE): speed depends on the slope at every point and on
+the ground (paved road, path, off-trail). See `tools/hikebook/timing.py`.
+
+The ground type comes from OpenStreetMap. `build_hikes.py` fetches it once
+per hike (needs internet) and saves `hikes\<id>\osm_ground.json`; after that
+it works offline. If OpenStreetMap can't be reached, everything counts as
+path. To fetch fresh data later, set `REFRESH = True` in `tools\fetch_osm.py`
+and run it.
+
+Readers can set their own pace with the tortoise–hare slider under the stats
+(default in `src/config.js` → `pace`). It changes the total, the time left
+from your location, and the times in the elevation profile readout.
 
 ## Background photos
 

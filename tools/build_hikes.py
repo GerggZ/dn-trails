@@ -7,6 +7,11 @@ For every hikes/<id>/ folder (track.gpx + hike.json + photos/) this writes:
     web/public/data/hikes.json        the list shown on the index page
     web/public/photos/<id>/           web-sized photos and thumbnails
 
+The walking-time estimate needs the ground type along the trail, which comes
+from OpenStreetMap (see fetch_osm.py). It's fetched once per hike and saved as
+hikes/<id>/osm_ground.json; without internet the build still works and
+counts everything as "path".
+
 and for the photos in backgrounds/ (the blurred page backgrounds):
     web/public/backgrounds/            resized copies
     web/public/data/backgrounds.json   the list the website picks from
@@ -27,7 +32,8 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from hikebook.gpx import read_gpx  # noqa: E402
-from hikebook import metrics  # noqa: E402
+from hikebook import metrics, timing  # noqa: E402
+import fetch_osm  # noqa: E402
 from hikebook.photos import list_photos, process_background, process_photo  # noqa: E402
 from hikebook.palette import palette_from_image  # noqa: E402
 
@@ -39,6 +45,10 @@ DATA_DIR = PUBLIC_DIR / "data"
 PHOTOS_DIR = PUBLIC_DIR / "photos"
 BACKGROUNDS_OUT = PUBLIC_DIR / "backgrounds"
 
+# Ask OpenStreetMap for hikes that don't have osm_ground.json yet
+# (False = never go online; missing ground types then count as "path")
+FETCH_OSM = True
+
 HIKE_DEFAULTS = {
     "title": "",
     "date": "",
@@ -49,6 +59,9 @@ HIKE_DEFAULTS = {
     "cover": "",
     "captions": {},
     "draft": False,
+    # Ground for the walking-time estimate: "auto" (from OpenStreetMap),
+    # or force one for the whole hike: "paved", "path" or "offtrail"
+    "ground": "auto",
 }
 
 
@@ -90,6 +103,11 @@ def build_hike(folder: Path) -> dict | None:
     dist_km = metrics.cumulative_distance_km(gpx.lat, gpx.lon)
     ascent, descent = metrics.ascent_descent_m(gpx.ele_m)
     grade = metrics.grade_percent(dist_km, gpx.ele_m)
+    ground = ground_types(folder, info, gpx)
+    time_s = timing.walking_time_s(dist_km, grade, ground)
+    km = fetch_osm.summary_km(ground, dist_km)
+    print(f"    walking time ≈ {time_s[-1] / 3600:.1f} h  ("
+          + ", ".join(f"{g} {v} km" for g, v in km.items() if v) + ")")
 
     waypoints = []
     for wp in gpx.waypoints:
@@ -133,7 +151,11 @@ def build_hike(folder: Path) -> dict | None:
         "descent_m": round(descent),
         "max_elevation_m": round(float(gpx.ele_m.max())),
         "min_elevation_m": round(float(gpx.ele_m.min())),
+        # Clock time of the recorded GPX, breaks and nights included (not shown any more)
         "duration_h": (round(d, 2) if (d := metrics.duration_hours(gpx.times)) else None),
+        # Estimated moving time for an average hiker (hikebook/timing.py)
+        "walking_time_h": round(float(time_s[-1]) / 3600, 2),
+        "ground_km": km,
     }
 
     hike = {
@@ -159,11 +181,39 @@ def build_hike(folder: Path) -> dict | None:
             "ele_m": np.round(gpx.ele_m, 1).tolist(),
             "dist_km": np.round(dist_km, 4).tolist(),
             "grade_pct": np.round(grade, 1).tolist(),
+            # Model walking time from the start to each point (seconds, average walker)
+            "time_s": np.round(time_s).astype(int).tolist(),
+            # For the pace slider (web/src/lib/walking-time.js): slope of each stretch
+            # between two points (degrees), and the ground as [[first point, type], ...]
+            "slope_deg": np.round(timing.segment_slopes_deg(grade), 1).tolist(),
+            "ground": fetch_osm.runs(ground),
         },
     }
 
     write_json(DATA_DIR / "hikes" / f"{hike_id}.json", hike)
     return hike
+
+
+def ground_types(folder: Path, info: dict, gpx) -> list[str]:
+    """Ground type per track point: forced in hike.json, from OpenStreetMap, or "path"."""
+    n = len(gpx.lat)
+    forced = info.get("ground") or "auto"
+    if forced in timing.COEFFICIENTS:
+        return [forced] * n
+    if forced != "auto":
+        warn(folder.name, f'unknown "ground": "{forced}" (use auto, paved, path or offtrail)')
+
+    cached = fetch_osm.load_cached(folder, gpx.lat, gpx.lon)
+    if cached is not None:
+        return cached
+    if not FETCH_OSM:
+        return ["path"] * n
+    ground, note = fetch_osm.ground_for_hike(folder, gpx.lat, gpx.lon)
+    if ground is None:
+        warn(folder.name, f"{note} – counting everything as path for now")
+        return ["path"] * n
+    print(f"    {note}")
+    return ground
 
 
 def profile_points(dist_km: np.ndarray, ele_m: np.ndarray, n: int = 72) -> list[float]:

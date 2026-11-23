@@ -4,7 +4,9 @@ import './styles/hike.css';
 import './styles/gallery.css';
 
 import { loadHike, asset, el } from './lib/data.js';
-import { fmtDist, fmtElev, fmtDuration } from './lib/units.js';
+import { fmtDist, fmtElev, fmtDuration, fmtWalk } from './lib/units.js';
+import { onPaceChange, paceSlider } from './lib/pace.js';
+import { hasTimes, totalHours } from './lib/walking-time.js';
 import { cutOut, resample } from './lib/silhouette.js';
 import { scenery } from './lib/scenery.js';
 import { renderBackdrop } from './lib/backdrop.js';
@@ -36,20 +38,33 @@ function renderHeader(hike) {
         hike.location || '';
 
     const s = hike.stats;
+    // Estimated walking time at the reader's pace; older data: the GPX's clock time
+    const timeStat = hasTimes(hike)
+        ? ['walking time', fmtWalk(totalHours(hike)), 'walk-time']
+        : ['time', fmtDuration(s.duration_h)];
     const stats = [
         ['distance', fmtDist(s.distance_km)],
         ['climb', fmtElev(s.ascent_m)],
         ['descent', fmtElev(s.descent_m)],
         ['highest point', fmtElev(s.max_elevation_m)],
-        ['time', fmtDuration(s.duration_h)],
+        timeStat,
         ['difficulty', hike.difficulty],
     ].filter(([, value]) => value);
 
-    document.getElementById('stats').append(...stats.map(([label, value]) =>
+    const statsEl = document.getElementById('stats');
+    statsEl.append(...stats.map(([label, value, id]) =>
         el('div', { className: 'stat' },
-            el('dd', { textContent: value }),
+            el('dd', { textContent: value, ...(id ? { id } : {}) }),
             el('dt', { textContent: label }),
         )));
+
+    if (hasTimes(hike)) {
+        statsEl.after(paceSlider());
+        onPaceChange(() => {
+            const dd = document.getElementById('walk-time');
+            if (dd) dd.textContent = fmtWalk(totalHours(hike));
+        });
+    }
 
     if (hike.description || hike.companions.length) {
         const box = document.getElementById('description');

@@ -91,6 +91,24 @@ export const APP_CONFIG = {
     slopeSmoothing: 0.03,
     get slopeColors() { return this.slopeSchemes[this.slopeScheme] ?? this.slopeSchemes.soft; },
 
+    // Walking-time estimate and the tortoise–hare slider under the stats.
+    // The maths is in src/lib/walking-time.js; the model itself in tools/hikebook/timing.py.
+    pace: {
+        // The model (brisk UK walkers) is a tinge fast: the middle of the slider
+        // ("average pace") = calibration × the model's speed. 0.65 ≈ Komoot / DAV signposts.
+        calibration: 0.65,
+        // Slider range in % of that average pace: 70 = tortoise end, 145 = hare end
+        default: 100, min: 70, max: 145, step: 5,
+        // How strongly the slider acts at each steepness: [slope in degrees, strength].
+        // 1 = fully (a tortoise at 70% is 30% slower there), 0.5 = half as much
+        // (15% slower). In between is blended. Climbs depend most on fitness;
+        // flat and gentle descents less; steep descents again more (sure-footedness, knees).
+        // These are reasoned guesses, not measured — tune to taste.
+        strength: [[-30, 0.85], [-12, 0.55], [-4, 0.5], [0, 0.6], [6, 0.9], [15, 1.0]],
+        // Extra strength by ground type (added to the above): rough ground spreads people out more
+        groundStrength: { paved: 0, path: 0, offtrail: 0.2 },
+    },
+
     // How strongly the hover snaps onto nearby waypoints (fraction of total distance)
     gravity: {
         map: 0.02,
