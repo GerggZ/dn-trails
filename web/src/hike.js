@@ -18,9 +18,11 @@ import { renderGallery } from './hike/gallery.js';
 import { setupLocate } from './hike/locate.js';
 import { setupOfflineSave } from './hike/offline.js';
 import { watchForUpdates } from './lib/version.js';
+import { keepFullScreen } from './lib/full-screen.js';
 
 registerServiceWorker();
 watchForUpdates();
+keepFullScreen();
 
 function renderHero(hike) {
     const hero = document.getElementById('hero');

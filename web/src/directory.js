@@ -23,9 +23,11 @@ import { setupOverviewLocate } from './lib/overview-locate.js';
 import { APP_CONFIG } from './config.js';
 import { registerServiceWorker, setupInstallButton } from './lib/pwa.js';
 import { watchForUpdates } from './lib/version.js';
+import { keepFullScreen } from './lib/full-screen.js';
 
 registerServiceWorker();
 watchForUpdates();
+keepFullScreen();
 setupInstallButton(document.getElementById('install'), document.getElementById('install-hint'));
 // The version line goes at the very end of the list (it's added to the panel)
 {
