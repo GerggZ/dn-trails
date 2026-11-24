@@ -4,7 +4,7 @@
   "description": "Our hikes: maps, elevation profiles, photos and stories.",
   "start_url": "./index.html",
   "scope": "./",
-  "display": "standalone",
+  "display": "fullscreen",
   "background_color": "#E9ECDA",
   "theme_color": "#E9ECDA",
   "icons": [
