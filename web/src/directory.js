@@ -10,7 +10,8 @@ import './fonts.js';
 import './styles/base.css';
 import './styles/directory.css';
 
-import { loadHikeIndex, asset, el } from './lib/data.js';
+import { listHikes, asset, el } from './lib/data.js';
+import { setupViewingAs } from './lib/viewing-as.js';
 import { fmtDist, fmtElev, fmtWalk } from './lib/units.js';
 import { cutOut } from './lib/silhouette.js';
 import { renderBackdrop } from './lib/backdrop.js';
@@ -366,7 +367,9 @@ sheet.set('mid', { animate: false });
 setupSheetDrag();
 setupCards();
 
-loadHikeIndex()
+setupViewingAs(document.getElementById('site-bar'));
+
+listHikes()
     .then((hikes) => {
         renderTotals(hikes);
         if (!hikes.length) {

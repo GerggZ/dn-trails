@@ -3,8 +3,10 @@
   "date": "2025-08-23",
   "location": "",
   "owner": "gregg",
-  "public": true,
-  "shared_with": [],
+  "public": false,
+  "shared_with": [
+    "dn"
+  ],
   "companions": [],
   "difficulty": "",
   "cover": "",

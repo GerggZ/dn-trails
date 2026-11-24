@@ -3,7 +3,8 @@ import './styles/base.css';
 import './styles/hike.css';
 import './styles/gallery.css';
 
-import { loadHike, asset, el } from './lib/data.js';
+import { getHike, asset, el } from './lib/data.js';
+import { setupViewingAs } from './lib/viewing-as.js';
 import { fmtDist, fmtElev, fmtDuration, fmtWalk } from './lib/units.js';
 import { onPaceChange, paceSlider } from './lib/pace.js';
 import { hasTimes, totalHours } from './lib/walking-time.js';
@@ -91,11 +92,12 @@ function renderHeader(hike) {
 }
 
 const id = new URLSearchParams(window.location.search).get('id');
+setupViewingAs(document.querySelector('.site-bar'));
 
 if (!id) {
     window.location.replace('./index.html');
 } else {
-    loadHike(id)
+    getHike(id)
         .then(async (hike) => {
             await renderBackdrop(hike); // sets the page colors, so it goes first
             renderHero(hike);

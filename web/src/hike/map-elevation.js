@@ -1169,9 +1169,37 @@ export function renderMapAndElevation(hike) {
         overlay.style.setProperty('--dock-cover', `${dockCover()}px`);
     }
 
+    // Phones: the full-screen map also hides the phone's own status and navigation
+    // bars where the browser allows it (Android). iPhones have no such API; there
+    // the map runs behind the clock and the home bar instead (viewport-fit=cover
+    // + black-translucent status bar in hike.html).
+    let screenFull = false; // we put the page into browser full screen
+    function enterScreenFull() {
+        const root = document.documentElement;
+        if (!compact.matches || !root.requestFullscreen || document.fullscreenElement) return;
+        root.requestFullscreen({ navigationUI: 'hide' })
+            .then(() => { screenFull = true; })
+            .catch(() => { /* not allowed here: keep the bars */ });
+    }
+    function exitScreenFull() {
+        if (!screenFull) return;
+        screenFull = false;
+        if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+    }
+    document.addEventListener('fullscreenchange', () => {
+        if (document.fullscreenElement) {
+            if (full) { map.invalidateSize(); updateCover(); }
+            return;
+        }
+        // Left full screen by the phone's back gesture: that closes the map too
+        if (screenFull) { screenFull = false; closeFull(); }
+        else if (full) { map.invalidateSize(); updateCover(); }
+    });
+
     function openFull() {
         if (full) return;
         full = true;
+        enterScreenFull(); // first, while the tap still counts as a user gesture
         dockExtra = Math.min(dockExtra, maxExtra());
         overlay.prepend(mapBox);
         dock.append(container, progress);
@@ -1186,6 +1214,7 @@ export function renderMapAndElevation(hike) {
     function closeFull(fromBackButton = false) {
         if (!full) return;
         full = false;
+        exitScreenFull();
         view = [0, totalDistance]; // the page always shows the whole hike
         terrainBox.insertBefore(mapBox, statusEl);
         statusEl.after(container, progress);

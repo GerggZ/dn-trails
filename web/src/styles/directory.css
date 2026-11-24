@@ -6,6 +6,7 @@
 .explore-page .site-bar {
     max-width: none;
     padding: 12px var(--gutter);
+    padding-top: calc(12px + env(safe-area-inset-top));
 }
 
 .explore {
