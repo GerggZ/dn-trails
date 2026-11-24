@@ -26,7 +26,18 @@
             <p class="lead" id="totals"></p>
         </section>
 
-        <div class="hike-grid" id="hike-grid"></div>
+        <section class="finder" aria-label="Find hikes near a place">
+            <form class="place-search" id="place-search" role="search">
+                <svg class="place-search-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></svg>
+                <input type="search" id="place-input" name="place" placeholder="Near a place, e.g. Garmisch" autocomplete="off" enterkeyhint="search" aria-label="Place">
+                <button class="pill" type="submit">Search</button>
+            </form>
+            <p class="place-status" id="place-status" aria-live="polite" hidden></p>
+            <div class="overview-map" id="overview-map"></div>
+            <p class="you-status" id="you-status" aria-live="polite" hidden></p>
+        </section>
+
+        <div class="hike-list" id="hike-list"></div>
     </main>
 
     <script type="module" src="/src/directory.js"></script>

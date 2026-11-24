@@ -173,6 +173,8 @@ def build_hike(folder: Path) -> dict | None:
         "palette": palette_from_image(folder / "photos" / cover["file"]) if cover else None,
         "profile": profile_points(dist_km, gpx.ele_m),
         "bbox": metrics.bbox(gpx.lat, gpx.lon),
+        # A light copy of the trail for the map on the index page: [[lat, lon], ...]
+        "line": line_points(gpx.lat, gpx.lon),
         "waypoints": waypoints,
         "photos": photos,
         "track": {
@@ -222,6 +224,12 @@ def profile_points(dist_km: np.ndarray, ele_m: np.ndarray, n: int = 72) -> list[
     return np.round(np.interp(xs, dist_km, ele_m)).tolist()
 
 
+def line_points(lat: np.ndarray, lon: np.ndarray, n: int = 160) -> list[list[float]]:
+    """Every k-th track point (always incl. the last one), about n in all, rounded to ~1 m."""
+    idx = np.unique(np.append(np.linspace(0, len(lat) - 1, min(n, len(lat))).round().astype(int), len(lat) - 1))
+    return [[round(float(lat[i]), 5), round(float(lon[i]), 5)] for i in idx]
+
+
 def write_json(path: Path, data) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(data, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
@@ -260,7 +268,7 @@ def main() -> None:
                 shutil.rmtree(stale)
 
     index = [
-        {k: h[k] for k in ("id", "title", "date", "location", "difficulty", "cover", "cover_src", "bbox", "stats", "profile")}
+        {k: h[k] for k in ("id", "title", "date", "location", "difficulty", "cover", "cover_src", "bbox", "stats", "profile", "line")}
         for h in sorted(hikes, key=lambda h: h["date"] or "", reverse=True)
     ]
     write_json(DATA_DIR / "hikes.json", index)

@@ -23,6 +23,10 @@ const slopeColor = (() => {
     return (gradePct) => scale(Math.abs(gradePct));
 })();
 
+// Steepness line on the profile (see drawSlices / render in drawProfile)
+const SLICE_STEP = 1.5; // px length of one slice
+const SETTLE_MS = 150; // after the last zoom/slide frame, swap the quick line for the slices
+
 /** Steepness at a point for the readout: "+12%", "−8%" or "flat". */
 function gradeText(point) {
     const g = Math.round(point.grade);
@@ -72,6 +76,7 @@ export function renderMapAndElevation(hike) {
         lat: t.lat[i],
         lon: t.lon[i],
         grade: smoothGrade[i],
+        colorGrade: colorGrade[i],
         color: slopeColor(colorGrade[i]),
     }));
 
@@ -219,17 +224,60 @@ export function renderMapAndElevation(hike) {
         const zoomed = isZoomed();
         if (zoomed !== dimmed) {
             dimmed = zoomed;
-            trailLine.setStyle({ opacity: zoomed ? DIM : 1 });
-            casingLine?.setStyle({ opacity: zoomed ? 0.9 * DIM : 0.9 });
+            fadeTrail(zoomed ? DIM : 1);
         }
-        if (!zoomed) {
-            if (stretchLine.getLatLngs().length) stretchLine.setLatLngs([]);
-            return;
+        // Only redrawn when the visible stretch really changed. And not while the map is
+        // flying / zoom-animating: Leaflet then moves the whole trail layer as a scaled
+        // picture, and a line redrawn in between lands in the wrong place until the
+        // animation ends (the bold stretch "stayed put, then snapped"). Then it waits for moveend.
+        const key = zoomed ? `${view[0]}|${view[1]}` : '';
+        if (key === stretchKey) return;
+        stretchKey = key;
+        let pts = [];
+        if (zoomed) {
+            const i0 = bisect.right(data, view[0]);
+            const i1 = bisect.left(data, view[1]);
+            pts = [latLngAt(view[0]), ...latlngs.slice(i0, i1), latLngAt(view[1])];
         }
-        const i0 = bisect.right(data, view[0]);
-        const i1 = bisect.left(data, view[1]);
-        stretchLine.setLatLngs([latLngAt(view[0]), ...latlngs.slice(i0, i1), latLngAt(view[1])]);
+        if (!pts.length && fadeFrame != null) clearAfterFade = true; // un-dimming: keep the bold part until the fade is done
+        else if (map._animatingZoom) pendingStretch = pts;
+        else {
+            pendingStretch = null;
+            stretchLine.setLatLngs(pts);
+        }
     }
+    // Dimming the rest of the trail: a short fade
+    const FADE_MS = 220;
+    let fadeFrame = null;
+    let clearAfterFade = false;
+    function setTrailOpacity(o) {
+        trailLine.setStyle({ opacity: o });
+        casingLine?.setStyle({ opacity: 0.9 * o });
+    }
+    function fadeTrail(to) {
+        if (fadeFrame != null) cancelAnimationFrame(fadeFrame);
+        fadeFrame = null;
+        clearAfterFade = false; // (set again by showStretch when this fade un-dims)
+        const from = trailLine.options.opacity;
+        const t0 = performance.now();
+        const step = (now) => {
+            const t = Math.min(1, (now - t0) / FADE_MS);
+            const e = t * t * (3 - 2 * t); // smoothstep
+            setTrailOpacity(from + (to - from) * e);
+            if (t < 1) { fadeFrame = requestAnimationFrame(step); return; }
+            fadeFrame = null;
+            if (clearAfterFade) { clearAfterFade = false; stretchLine.setLatLngs([]); }
+        };
+        fadeFrame = requestAnimationFrame(step);
+    }
+    let stretchKey = '';
+    let pendingStretch = null; // waiting for the map animation to finish
+    function applyPendingStretch() {
+        if (!pendingStretch) return;
+        stretchLine.setLatLngs(pendingStretch);
+        pendingStretch = null;
+    }
+    map.on('moveend', applyPendingStretch);
 
     const [minElev, maxElev] = d3.extent(data, (d) => d.elevation);
     const elevPad = maxElev - minElev === 0 ? 50 : (maxElev - minElev) * 0.2;
@@ -284,9 +332,17 @@ export function renderMapAndElevation(hike) {
 
         const plot = svg.append('g').attr('clip-path', 'url(#profile-clip)');
         const areaPath = plot.append('path').attr('fill', C.terrain);
+        // The steepness line is drawn two ways (compared on the "Slope color test" page):
+        //  - at rest: thin slices cut square across the line, so the colors change
+        //    along the line's own direction, also on steep climbs (drawSlices below)
+        //  - while zooming / sliding: one path with a left-to-right gradient, much
+        //    cheaper per frame; SETTLE_MS after the last frame it swaps back to slices
+        const lineWidth = APP_CONFIG.profileLineWidth ?? 3.5;
         const linePath = plot.append('path')
-            .attr('fill', 'none').attr('stroke', 'url(#slope-gradient)')
-            .attr('stroke-width', 3.5).attr('stroke-linecap', 'round').attr('stroke-linejoin', 'round');
+            .attr('fill', 'none').attr('stroke', 'url(#slope-gradient)').style('display', 'none')
+            .attr('stroke-width', lineWidth).attr('stroke-linecap', 'round').attr('stroke-linejoin', 'round');
+        const sliceGroup = plot.append('g').attr('class', 'profile-slices')
+            .attr('stroke-width', 0.6).attr('stroke-linejoin', 'round'); // hairline outline hides seams between slices
         const area = d3.area().x((d) => x(d.distance)).y0(height).y1((d) => y(d.elevation)).curve(d3.curveMonotoneX);
         const line = d3.line().x((d) => x(d.distance)).y((d) => y(d.elevation)).curve(d3.curveMonotoneX);
 
@@ -321,7 +377,8 @@ export function renderMapAndElevation(hike) {
         // Everything that depends on the visible stretch; cheap enough to run every frame
         const endGapPx = narrow ? 48 : 60;
         const endLabel = (Math.round(totalDistance * 10) / 10).toLocaleString('en');
-        function render() {
+        let settleTimer = null;
+        function render(moving = false) {
             x.domain(view);
             const zoomed = isZoomed();
             // Not zoomed: let the trailhead symbols poke out a bit; zoomed: cut at the edges
@@ -333,7 +390,16 @@ export function renderMapAndElevation(hike) {
             const i1 = Math.min(data.length, bisect.right(data, view[1]) + 1);
             const visible = data.slice(i0, i1);
             areaPath.attr('d', area(visible));
-            linePath.attr('d', line(visible));
+            clearTimeout(settleTimer);
+            if (moving) {
+                linePath.style('display', null).attr('d', line(visible));
+                sliceGroup.style('display', 'none');
+                settleTimer = setTimeout(() => render(), SETTLE_MS);
+            } else {
+                linePath.style('display', 'none');
+                sliceGroup.style('display', null);
+                drawSlices(visible);
+            }
 
             for (const { s, g, label, size } of markEls) {
                 const p = data[s.index];
@@ -366,6 +432,66 @@ export function renderMapAndElevation(hike) {
             keepDotInView();
             placeHover();
             placeYou();
+        }
+
+        // The line as thin slices (~SLICE_STEP px long) along the same smooth curve as
+        // the fill, each cut square across the line and filled with the color of its
+        // own steepness. d3's curve is traced into a recorder instead of a path
+        // string, and its Bézier pieces are flattened into points.
+        function drawSlices(visible) {
+            const pts = [];
+            let cx = 0, cy = 0;
+            const rec = {
+                moveTo(px, py) { pts.push([px, py]); cx = px; cy = py; },
+                lineTo(px, py) {
+                    const n = Math.max(1, Math.ceil(Math.hypot(px - cx, py - cy) / SLICE_STEP));
+                    for (let j = 1; j <= n; j++) pts.push([cx + ((px - cx) * j) / n, cy + ((py - cy) * j) / n]);
+                    cx = px; cy = py;
+                },
+                bezierCurveTo(ax, ay, bx, by, px, py) {
+                    const len = Math.hypot(ax - cx, ay - cy) + Math.hypot(bx - ax, by - ay) + Math.hypot(px - bx, py - by);
+                    const n = Math.max(1, Math.ceil(len / SLICE_STEP));
+                    for (let j = 1; j <= n; j++) {
+                        const t = j / n, u = 1 - t;
+                        pts.push([
+                            u * u * u * cx + 3 * u * u * t * ax + 3 * u * t * t * bx + t * t * t * px,
+                            u * u * u * cy + 3 * u * u * t * ay + 3 * u * t * t * by + t * t * t * py,
+                        ]);
+                    }
+                    cx = px; cy = py;
+                },
+                closePath() {},
+            };
+            d3.line().x((d) => x(d.distance)).y((d) => y(d.elevation)).curve(d3.curveMonotoneX).context(rec)(visible);
+            if (pts.length < 2) { sliceGroup.html(''); return; }
+
+            // Color at each point: the smoothed steepness at that distance, blended between track points
+            const colors = pts.map(([px]) => {
+                const d = x.invert(px);
+                const i = Math.min(Math.max(bisect.right(data, d), 1), data.length - 1);
+                const a = data[i - 1], b = data[i];
+                const f = b.distance > a.distance ? Math.min(Math.max((d - a.distance) / (b.distance - a.distance), 0), 1) : 0;
+                return slopeColor(a.colorGrade + (b.colorGrade - a.colorGrade) * f);
+            });
+            // Sideways offset at each point, from the direction on both sides, so neighbouring slices share an edge
+            const half = lineWidth / 2;
+            const off = pts.map((_, i) => {
+                const a = pts[Math.max(0, i - 1)], b = pts[Math.min(pts.length - 1, i + 1)];
+                const dx = b[0] - a[0], dy = b[1] - a[1], len = Math.hypot(dx, dy) || 1;
+                return [(-dy / len) * half, (dx / len) * half];
+            });
+            const r = (v) => v.toFixed(1);
+            let html = '';
+            for (let i = 0; i < pts.length - 1; i++) {
+                const [ax, ay] = pts[i], [bx, by] = pts[i + 1], [nax, nay] = off[i], [nbx, nby] = off[i + 1];
+                const c = colors[i];
+                html += `<path d="M${r(ax + nax)},${r(ay + nay)}L${r(bx + nbx)},${r(by + nby)}L${r(bx - nbx)},${r(by - nby)}L${r(ax - nax)},${r(ay - nay)}Z" fill="${c}" stroke="${c}"/>`;
+            }
+            // Round ends, like the line's round caps
+            const last = pts.length - 1;
+            html += `<circle cx="${r(pts[0][0])}" cy="${r(pts[0][1])}" r="${half}" fill="${colors[0]}"/>`
+                + `<circle cx="${r(pts[last][0])}" cy="${r(pts[last][1])}" r="${half}" fill="${colors[last - 1]}"/>`;
+            sliceGroup.html(html);
         }
 
         // Zoomed in and the view moves past the dot: the dot is pushed along at the edge
@@ -402,7 +528,39 @@ export function renderMapAndElevation(hike) {
         const pointers = new Map(); // pointerId -> x in the plot
         let pinch = null; // the two distances under the fingers when the pinch started
         let afterPinch = false; // one finger still down after a pinch: ignore it until it lifts
-        let pan = null; // { px, view, moved } while sliding the profile
+        let pan = null; // { px, view, moved, samples } while sliding the profile
+        // Momentum: a flick keeps the profile sliding, slowing down (like flicking a map)
+        const FLICK_MS = 80; // the speed is measured over the last ~80 ms of the drag
+        const MIN_FLICK = 0.25; // px per ms to count as a flick
+        const STOP_SPEED = 0.02; // px per ms: slow enough to stop
+        const FRICTION = 0.92; // speed kept per 1/60 s (lower = stops sooner; tuned by Gregg)
+        let momentumFrame = null;
+        function stopMomentum() {
+            if (momentumFrame == null) return false;
+            cancelAnimationFrame(momentumFrame);
+            momentumFrame = null;
+            return true;
+        }
+        function startMomentum(unitsPerMs) {
+            let last = performance.now();
+            const step = (now) => {
+                const dt = Math.min(64, Math.max(0, now - last));
+                last = now;
+                const span = view[1] - view[0];
+                const moved = setView(view[0] + unitsPerMs * dt, view[1] + unitsPerMs * dt);
+                unitsPerMs *= FRICTION ** (dt / (1000 / 60));
+                if (!moved || Math.abs(unitsPerMs) * (width / span) < STOP_SPEED) {
+                    momentumFrame = null;
+                    render();
+                    followMap(true);
+                    return;
+                }
+                render(true);
+                followMap(false);
+                momentumFrame = requestAnimationFrame(step);
+            };
+            momentumFrame = requestAnimationFrame(step);
+        }
         const GRAB = 34; // px around the dot that count as "on the dot"
         const TAP_SLOP = 6; // px a finger may wobble and still count as a tap
         let scrub = null; // { px, pageX, pageY, touch } of the scrubbing finger
@@ -425,7 +583,7 @@ export function renderMapAndElevation(hike) {
             const shift = Math.max(-1, Math.min(1, depth / EDGE)) * span * 0.025;
             if (!setView(view[0] + shift, view[1] + shift)) return; // reached the start/end of the hike
             edgeMoved = true;
-            render();
+            render(true);
             hoverAt(scrub.px);
             followMap(false);
             edgeFrame = requestAnimationFrame(edgeStep);
@@ -447,7 +605,14 @@ export function renderMapAndElevation(hike) {
                 followMap(true);
             }
             if (pan && pointers.size === 0) {
-                if (pan.moved) followMap(true);
+                // A flick (still moving fast when the finger lifts): let it slide on
+                const recent = pan.samples.filter((p) => event.timeStamp - p.t <= FLICK_MS);
+                const first = recent[0], lastS = recent[recent.length - 1];
+                const speed = first && lastS.t > first.t ? (lastS.v - first.v) / (lastS.t - first.t) : 0; // display units per ms
+                const span = view[1] - view[0];
+                if (pan.moved && event.type === 'pointerup'
+                    && Math.abs(speed) * (width / span) >= MIN_FLICK) startMomentum(speed);
+                else if (pan.moved) followMap(true);
                 else if (event.type === 'pointerup') onScrub(event, pan.px); // a tap: put the dot there
                 pan = null;
                 if (edgeFrame != null) { cancelAnimationFrame(edgeFrame); edgeFrame = null; }
@@ -463,6 +628,7 @@ export function renderMapAndElevation(hike) {
             .style('touch-action', full ? 'none' : 'pan-y')
             .on('pointerdown', (event) => {
                 if (peek()) return;
+                if (stopMomentum()) followMap(true); // a finger down catches a sliding profile (the map settles there)
                 const [px] = d3.pointer(event);
                 pointers.set(event.pointerId, px);
                 if (full) event.currentTarget.setPointerCapture(event.pointerId);
@@ -477,7 +643,7 @@ export function renderMapAndElevation(hike) {
                 const dotPx = hover ? x(hover.point.distance) : null;
                 const onDot = dotPx != null && dotPx >= 0 && dotPx <= width && Math.abs(px - dotPx) <= GRAB;
                 if (full && isZoomed() && !onDot) {
-                    pan = { px, view: [...view], moved: false };
+                    pan = { px, view: [...view], moved: false, samples: [] };
                     return;
                 }
                 onScrub(event, px);
@@ -491,7 +657,7 @@ export function renderMapAndElevation(hike) {
                     if (!(pxPerUnit > 0) || Math.abs(b - a) < 12) return; // fingers crossed / together
                     const start = pinch.va - a / pxPerUnit;
                     setView(start, start + width / pxPerUnit);
-                    render();
+                    render(true);
                     followMap(false);
                     return;
                 }
@@ -503,7 +669,9 @@ export function renderMapAndElevation(hike) {
                     const span = pan.view[1] - pan.view[0];
                     const start = pan.view[0] - (dx / width) * span;
                     setView(start, start + span);
-                    render();
+                    pan.samples.push({ t: event.timeStamp, v: view[0] });
+                    if (pan.samples.length > 20) pan.samples.shift();
+                    render(true);
                     followMap(false);
                     return;
                 }
@@ -548,7 +716,7 @@ export function renderMapAndElevation(hike) {
             const newSpan = span * Math.exp(Math.max(-0.5, Math.min(0.5, zoomBy)));
             const start = at - (px / width) * newSpan + (dx / width) * span;
             setView(start, start + newSpan);
-            render();
+            render(true);
             followMap(false);
             clearTimeout(wheelTimer);
             wheelTimer = setTimeout(() => followMap(true), 250);
@@ -570,40 +738,175 @@ export function renderMapAndElevation(hike) {
         youGroup.select('circle').attr('cx', x(p.distance)).attr('cy', y(p.elevation));
     }
 
-    // The map shows the part of the trail that's visible on the profile.
-    // During a gesture it only pans (and zooms out if needed) so it doesn't
-    // flicker between zoom levels; when the gesture ends it settles on a good fit.
+    // The map shows the part of the trail that's visible on the profile, like a
+    // calm camera (chosen on 2026-11-24 after trying several ways):
+    //  - lazy: it stays still while the stretch fits; when the stretch nears the edge
+    //    it moves just as far as needed, and zooms out only if it doesn't fit any more
+    //  - glide: every move eases into place (GLIDE_SPEED of the remaining way per 1/60 s
+    //    for sliding, ZOOM_GLIDE_SPEED for zooming; the same on 60 and 120 Hz screens),
+    //    with in-between zoom levels meanwhile
+    //  - when the gesture ends the glide simply carries on to the final place: one
+    //    movement, no separate flight (it stays put if the stretch already fits well)
     const FIT_PAD = 40;
+    const GLIDE_SPEED = 0.09; // sliding: share of the remaining way per 1/60 s (lower = slower)
+    const ZOOM_GLIDE_SPEED = 0.07; // zooming in / out: the same, on its own (lower = slower)
+    const LAZY_REFIT = 0.35; // at the end, refit only if the stretch fills less than this share of the map
+    const SNAP = map.options.zoomSnap;
+    let cam = null; // where the glide is heading: { center, zoom }
+    let glideFrame = null;
+    let lastGlideT = 0;
+    let settling = false; // the gesture is over and the glide is carrying the map to its final place
+
+    // Moving the map frame by frame. map.setView without animation throws all
+    // tiles away whenever the zoom changes (a blank flash, then everything loads
+    // again). Leaflet's own flyTo avoids that by moving with the internal
+    // _moveStart / _move / _moveEnd, which keep the old tiles (scaled) until the
+    // new ones are in. We do the same. (Internal API: Leaflet 1.9.)
+    let camMoving = false;
+    function moveCam(center, zoom) {
+        if (!camMoving) {
+            map._stop();
+            map._moveStart(true, false);
+            camMoving = true;
+        }
+        // `pinch` makes the map announce every step as a zoom, also when only the
+        // centre moves, so markers and tiles are repositioned each frame (not just at the end)
+        map._move(center, zoom, { pinch: true });
+        // The trail lines live in an SVG drawn for the old view; draw them again for
+        // this one, otherwise they lag behind and the highlighted stretch drifts off
+        map.eachLayer((layer) => { if (layer instanceof L.Renderer) layer._reset(); });
+        applyPendingStretch();
+    }
+    function endCam() {
+        if (!camMoving) return;
+        camMoving = false;
+        map._moveEnd(true);
+    }
+
     // In full screen the profile floats over the bottom of the map: keep the trail above it
     const dockCover = () => (full ? Math.max(0, overlay.clientHeight - dock.offsetTop) : 0);
     const fitOpts = (extra = {}) => (full
         ? { paddingTopLeft: [FIT_PAD, FIT_PAD], paddingBottomRight: [FIT_PAD, FIT_PAD + dockCover()], ...extra }
         : { padding: [30, 30], ...extra });
-    function followMap(final) {
-        if (!full) return;
-        if (!isZoomed()) {
-            if (final) map.fitBounds(hike.bbox, fitOpts());
-            return;
-        }
+    // Room for the trail, in px around the map's centre: the map minus the padding and the docked profile
+    function safeBox() {
+        const s = map.getSize();
+        return { left: -s.x / 2 + FIT_PAD, right: s.x / 2 - FIT_PAD, top: -s.y / 2 + FIT_PAD, bottom: s.y / 2 - FIT_PAD - dockCover() };
+    }
+    function stretchBounds() {
+        if (!isZoomed()) return L.latLngBounds(hike.bbox);
         const i0 = bisect.left(data, view[0]);
         const i1 = Math.max(bisect.right(data, view[1]), i0 + 1);
-        const bounds = L.latLngBounds(data.slice(i0, i1).map((d) => [d.lat, d.lon]));
-        if (final) {
-            map.fitBounds(bounds, fitOpts({ maxZoom: 17 }));
-        } else if (map.getBoundsZoom(bounds, false, L.point(2 * FIT_PAD, 2 * FIT_PAD + dockCover())) >= map.getZoom()) {
-            // Centre the stretch in the part of the map above the profile
-            const c = map.project(bounds.getCenter()).add([0, dockCover() / 2]);
-            map.panTo(map.unproject(c), { animate: false });
-        } else {
-            map.fitBounds(bounds, fitOpts({ animate: false }));
-        }
+        return L.latLngBounds(data.slice(i0, i1).map((d) => [d.lat, d.lon]));
     }
+    // The stretch's box in px around a camera { center, zoom }
+    function boxAt(bounds, c) {
+        const mid = map.project(c.center, c.zoom);
+        const ne = map.project(bounds.getNorthEast(), c.zoom).subtract(mid);
+        const sw = map.project(bounds.getSouthWest(), c.zoom).subtract(mid);
+        return { left: sw.x, right: ne.x, top: ne.y, bottom: sw.y };
+    }
+    // During a gesture: where the camera should go for this stretch, coming from `from`
+    function target(bounds, from) {
+        const b = safeBox();
+        const s = map.getSize();
+        const fitZ = Math.min(17, map.getBoundsZoom(bounds, false, L.point(s.x - (b.right - b.left), s.y - (b.bottom - b.top))));
+        if (fitZ < from.zoom) {
+            // Doesn't fit any more: zoom out, centred in the part of the map above the profile
+            return { center: map.unproject(map.project(bounds.getCenter(), fitZ).add([0, dockCover() / 2]), fitZ), zoom: fitZ };
+        }
+        // Stay put, or shift just enough to bring the stretch back inside
+        const box = boxAt(bounds, from);
+        const dx = box.left < b.left ? box.left - b.left : box.right > b.right ? box.right - b.right : 0;
+        const dy = box.top < b.top ? box.top - b.top : box.bottom > b.bottom ? box.bottom - b.bottom : 0;
+        if (!dx && !dy) return from;
+        return { center: map.unproject(map.project(from.center, from.zoom).add([dx, dy]), from.zoom), zoom: from.zoom };
+    }
+    function startGlide() {
+        if (glideFrame != null) return;
+        lastGlideT = performance.now();
+        glideFrame = requestAnimationFrame(glideStep);
+    }
+    function glideStep(now) {
+        glideFrame = null;
+        if (!cam) return;
+        const dt = Math.min(64, Math.max(0, now - lastGlideT));
+        lastGlideT = now;
+        const frames = dt / (1000 / 60);
+        const k = 1 - (1 - GLIDE_SPEED) ** frames; // sliding
+        const kz = 1 - (1 - ZOOM_GLIDE_SPEED) ** frames; // zooming
+        const z0 = map.getZoom();
+        const p0 = map.project(map.getCenter(), z0);
+        const p1 = map.project(cam.center, z0);
+        const dz = cam.zoom - z0;
+        if (Math.abs(dz) < 0.003 && p0.distanceTo(p1) < 0.5) {
+            moveCam(cam.center, cam.zoom);
+            if (settling) finishSettle();
+            return;
+        }
+        moveCam(map.unproject(p0.add(p1.subtract(p0).multiplyBy(k)), z0), z0 + dz * kz);
+        glideFrame = requestAnimationFrame(glideStep);
+    }
+    function finishSettle() {
+        settling = false;
+        cam = null;
+        endCam();
+        map.options.zoomSnap = SNAP;
+    }
+    function followMap(final) {
+        if (!full) return;
+        const bounds = stretchBounds();
+        if (final) {
+            settleMap(bounds);
+            return;
+        }
+        settling = false; // a new gesture takes over from a settle in progress
+        map.options.zoomSnap = 0; // in-between zoom levels while gliding
+        const from = cam ?? { center: map.getCenter(), zoom: map.getZoom() };
+        cam = target(bounds, from);
+        startGlide();
+    }
+    // When the gesture is over: glide on to a good fit for the stretch, or stay
+    // (on a whole zoom step) if it already fits well
+    function settleMap(bounds) {
+        map.options.zoomSnap = SNAP; // the final place is on a whole zoom step
+        const here = cam ?? { center: map.getCenter(), zoom: map.getZoom() };
+        let goal = null;
+        if (isZoomed()) {
+            const b = safeBox();
+            const box = boxAt(bounds, here);
+            const inside = box.left >= b.left - 1 && box.right <= b.right + 1 && box.top >= b.top - 1 && box.bottom <= b.bottom + 1;
+            const fill = Math.max((box.right - box.left) / (b.right - b.left), (box.bottom - box.top) / (b.bottom - b.top));
+            if (inside && fill >= LAZY_REFIT) goal = { center: here.center, zoom: Math.floor(here.zoom / SNAP + 1e-6) * SNAP };
+        }
+        // Leaflet internal: the centre and zoom fitBounds would use
+        cam = goal ?? map._getBoundsCenterZoom(bounds, fitOpts(isZoomed() ? { maxZoom: 17 } : {}));
+        settling = true;
+        map.options.zoomSnap = 0;
+        startGlide();
+    }
+
+    // Tiles also load while the map moves (on phones Leaflet normally waits until it
+    // stops, so a glide showed blurry stretched tiles), with a few more kept around the
+    // edges. Leaflet reads these options when a layer is added, so the layer is re-added.
+    function liveTiles() {
+        map.eachLayer((layer) => {
+            if (!(layer instanceof L.GridLayer)) return;
+            if (layer.options.updateWhenIdle === false && layer.options.keepBuffer === 4) return;
+            layer.options.updateWhenIdle = false;
+            layer.options.keepBuffer = 4;
+            map.removeLayer(layer);
+            map.addLayer(layer);
+        });
+    }
+    liveTiles();
+    map.on('baselayerchange', liveTiles);
 
     /** Back to the whole hike, on the profile and on the map. */
     function resetView() {
         view = [0, totalDistance];
         profile.render();
-        map.fitBounds(hike.bbox, fitOpts());
+        settleMap(stretchBounds());
     }
 
     drawProfile();

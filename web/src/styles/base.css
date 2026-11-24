@@ -315,3 +315,26 @@ img { display: block; max-width: 100%; }
     cursor: pointer;
 }
 .update-reload:disabled { opacity: 0.7; cursor: progress; }
+
+/* --- Number with a small line icon (src/lib/icons.js) --- */
+.fact { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.fact-icon {
+    width: 0.95em;
+    height: 0.95em;
+    flex: none;
+    fill: none;
+    stroke: var(--ink-soft);
+    stroke-width: 1.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+}

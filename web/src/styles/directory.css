@@ -1,5 +1,5 @@
 .directory {
-    padding: 0 var(--gutter) 80px;
+    padding: 0 var(--gutter) 64px;
 }
 
 /* --- Intro --- */
@@ -20,75 +20,219 @@
     color: var(--ink-soft);
 }
 
-/* --- Grid of hikes --- */
-.hike-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
-    gap: clamp(36px, 5vw, 56px) clamp(20px, 3vw, 36px);
-}
+/* --- Find hikes near a place + the map of all hikes --- */
+.finder { margin: 0 0 clamp(28px, 4vw, 44px); }
 
-.hike-card {
-    display: block;
-    text-decoration: none;
+.place-search {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    max-width: 32rem;
+    padding: 4px 4px 4px 12px;
+    border: 1px solid color-mix(in srgb, var(--ink) 22%, transparent);
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--paper) 80%, transparent);
+}
+.place-search:focus-within { border-color: var(--accent); }
+.place-search-icon {
+    width: 16px; height: 16px; flex: none;
+    fill: none; stroke: var(--ink-soft); stroke-width: 1.6; stroke-linecap: round;
+}
+.place-search input {
+    flex: 1;
+    min-width: 0;
+    border: 0;
+    background: transparent;
+    font: inherit;
+    font-size: var(--step-0);
     color: var(--ink);
+    outline: none;
+}
+.place-search input::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; } /* "Clear" does that */
+.place-search input::placeholder { color: var(--ink-soft); opacity: 0.8; }
+.place-search .pill { padding: 4px 14px; }
+
+.place-status {
+    margin: 10px 0 0;
+    font-size: var(--step--1);
+    color: var(--ink-soft);
+}
+.place-status strong { color: var(--ink); font-weight: 600; }
+.place-clear {
+    margin-left: 4px;
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    color: var(--accent);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
 }
 
-/* Photo (or dark block) with the hike's own profile cut out of its bottom edge */
-.card-visual {
+.overview-map {
+    height: clamp(260px, 42vh, 420px);
+    margin-top: 16px;
+    border-radius: var(--radius);
+    background: var(--paper-deep);
+    z-index: 0;
+}
+.overview-place { background: none; border: 0; }
+
+
+/* Phones: the map on the page is a preview; a tap opens it full screen
+   (same as the hike map). Only the full-screen button shows on it. */
+.overview-map.map-peek { cursor: pointer; touch-action: pan-y; }
+.overview-map.map-peek .leaflet-control:not(.full-control):not(.leaflet-control-attribution) { display: none; }
+.full-control .full-button svg,
+.home-control .home-button svg { display: block; }
+
+html.map-open, html.map-open body { overflow: hidden; }
+
+.map-full {
+    position: fixed;
+    inset: 0;
+    z-index: 950;
+    height: 100vh;
+    height: 100dvh;
+    background: var(--paper);
+}
+.map-full[hidden] { display: none; }
+.map-full .overview-map {
+    /* !important: Leaflet sets position: relative inline */
+    position: absolute !important;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    border-radius: 0;
+}
+.map-full .leaflet-top { top: env(safe-area-inset-top); }
+.map-full .leaflet-bottom { bottom: env(safe-area-inset-bottom); }
+.overview-tip {
+    padding: 2px 8px;
+    border: 1px solid color-mix(in srgb, var(--ink) 22%, transparent);
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--paper) 94%, transparent);
+    box-shadow: 0 1px 3px color-mix(in srgb, var(--ink) 18%, transparent);
+    color: var(--ink);
+    font-family: var(--font-sign);
+    font-size: 14px;
+    font-weight: 600;
+}
+.overview-tip::before { display: none; }
+
+/* --- "You're at …" line under the map (same look as on a hike page) --- */
+.you-status {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    margin: 10px 0 0;
+    padding: 7px 12px;
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--paper) 70%, transparent);
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--accent);
+    color: var(--ink);
+    font-family: var(--font-sign);
+    font-size: var(--step-0);
+}
+.you-status::before {
+    content: '';
+    flex: none;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: #2A7FFF;
+    box-shadow: 0 0 0 2px #FFF;
+}
+.you-status[hidden] { display: none; }
+
+/* --- List of hikes: small picture left, name and numbers right --- */
+.hike-list {
+    display: flex;
+    flex-direction: column;
+    gap: clamp(18px, 3vw, 28px);
+}
+
+.hike-row {
+    display: grid;
+    grid-template-columns: clamp(140px, 26vw, 260px) minmax(0, 1fr);
+    gap: clamp(16px, 3vw, 32px);
+    align-items: center;
+    color: var(--ink);
+    text-decoration: none;
+}
+
+/* Photo (or generated landscape) with the hike's own profile cut out of its bottom edge */
+.hike-visual {
     position: relative;
     aspect-ratio: 4 / 3;
-    border-radius: var(--radius) var(--radius) 0 0;
+    border-radius: var(--radius);
     overflow: hidden;
 }
+.hike-visual .card-art img { transition: transform 0.6s ease; }
 
-.card-art img { transition: transform 0.6s ease; }
-
-.card-body { padding-top: 4px; }
-
-.card-title {
-    font-size: var(--step-3);
-    text-decoration: underline;
-    text-decoration-color: transparent;
-    text-decoration-thickness: 3px;
-    text-underline-offset: 5px;
+.hike-title {
+    font-size: var(--step-2);
+    text-decoration: underline 3px transparent;
+    text-underline-offset: 6px;
     transition: text-decoration-color 0.2s ease;
 }
 
-.card-meta {
-    margin: 6px 0 0;
-    color: var(--ink-soft);
-    font-size: var(--step--1);
-    font-style: italic;
-}
-
-.card-stats {
+.hike-away {
     display: flex;
-    gap: 22px;
-    margin: 14px 0 0;
-    padding-top: 12px;
-    border-top: 1px solid var(--rule);
+    align-items: center;
+    gap: 5px;
+    margin: 4px 0 0;
+    font-family: var(--font-sign);
+    font-size: var(--step-0);
+    font-weight: 600;
+    color: var(--accent);
+}
+.hike-away[hidden] { display: none; }
+.hike-away .fact-icon { stroke: var(--accent); }
+
+.hike-place {
+    margin: 6px 0 0;
+    font-style: italic;
+    color: var(--ink-soft);
 }
 
-.card-stat { display: flex; flex-direction: column; }
-
-.card-stat dd {
-    margin: 0;
-    order: 1;
+.hike-facts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px clamp(14px, 2.4vw, 24px);
+    margin: 10px 0 0;
     font-family: var(--font-sign);
     font-size: var(--step-1);
-    font-weight: 600;
-    line-height: 1.1;
-    white-space: nowrap;
+    font-weight: 500;
 }
 
-.card-stat dt {
-    order: 2;
-    font-size: var(--step--1);
-    color: var(--ink-soft);
+/* Another hike is picked out on the map */
+.hike-row { transition: opacity 0.25s ease, filter 0.25s ease; }
+.hike-row.dull { opacity: 0.45; filter: saturate(0.4); }
+.hike-row.dull:hover { opacity: 0.8; }
+
+.hike-row:hover .hike-title,
+.hike-row:focus-visible .hike-title { text-decoration-color: var(--accent); }
+.hike-row:hover .card-art img { transform: scale(1.035); }
+
+/* Phones: numbers as a 2×2 — distance + time on top, up + down together below */
+@media (max-width: 720px) {
+    .overview-map { height: 240px; margin-top: 12px; }
+    .place-search { max-width: none; }
+    .hike-row { grid-template-columns: 120px minmax(0, 1fr); gap: 14px; }
+    .hike-visual { border-radius: 8px; }
+    .hike-title { font-size: var(--step-1); }
+    .hike-facts {
+        display: grid;
+        grid-template-columns: repeat(2, max-content);
+        gap: 0 16px;
+        margin-top: 6px;
+        font-size: var(--step-0);
+    }
+    .hike-facts .fact:nth-child(4) { order: 1; }
+    .hike-facts .fact:nth-child(2),
+    .hike-facts .fact:nth-child(3) { order: 2; }
 }
-
-.hike-card:hover .card-title,
-.hike-card:focus-visible .card-title { text-decoration-color: var(--accent); }
-
-.hike-card:hover .card-art img { transform: scale(1.035); }
-

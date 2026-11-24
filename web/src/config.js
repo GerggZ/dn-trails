@@ -89,6 +89,8 @@ export const APP_CONFIG = {
     // How gently the profile line changes color: the steepness is averaged over
     // this fraction of the hike (0.01 = sharp, 0.03 = smooth, 0.06 = very smooth)
     slopeSmoothing: 0.03,
+    // Thickness of the steepness line on the elevation profile, in px
+    profileLineWidth: 4.5,
     get slopeColors() { return this.slopeSchemes[this.slopeScheme] ?? this.slopeSchemes.soft; },
 
     // Walking-time estimate and the tortoise–hare slider under the stats.
