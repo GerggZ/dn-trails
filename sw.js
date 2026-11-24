@@ -12,7 +12,7 @@
 // new pages, and the saved hike data refreshed. The value here is only used
 // if sw.js is served without building.
 
-const VERSION = "24 Nov 2026, 11:23 · 9751013";
+const VERSION = "24 Nov 2026, 14:27 · 0488782";
 const PAGES = `hb-pages-${VERSION}`;
 const ASSETS = 'hb-assets';
 const DATA = 'hb-data';
@@ -21,7 +21,7 @@ const TILES = 'hb-tiles';
 const MAX_TILES = 12000; // ≈ 300–400 MB; room for a few hikes saved at "Max detail"
 
 const SCOPE = self.registration.scope; // e.g. https://you.github.io/hiking-book/
-const CORE = ['', 'index.html', 'hike.html', 'manifest.webmanifest', 'data/hikes.json', 'data/backgrounds.json']
+const CORE = ['', 'index.html', 'hike.html', 'manifest.webmanifest', 'data/index.json', 'data/users.json', 'data/backgrounds.json']
     .map((p) => new URL(p, SCOPE).href);
 
 // Map pictures for every map in config.js mapLayers (OpenTopoMap, OpenStreetMap, Esri)
@@ -42,7 +42,7 @@ self.addEventListener('install', (event) => {
     })());
 });
 
-/** New version: fetch fresh copies of the saved hike data (hikes.json, each saved hike).
+/** New version: fetch fresh copies of the saved hike data (index.json, each saved hike).
  *  Offline or a hike that no longer exists: the old copy stays. */
 async function refreshData() {
     const cache = await caches.open(DATA);

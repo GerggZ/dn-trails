@@ -1,0 +1,1 @@
+{"users":[{"id":"gregg","name":"Gregg","admin":true},{"id":"danna","name":"Danna","admin":false},{"id":"neil","name":"Neil","admin":false},{"id":"ralf","name":"Ralf","admin":false},{"id":"louisa","name":"Louisa","admin":false}],"groups":[{"id":"dn","name":"Danna & Neil","members":["danna","neil"]}]}

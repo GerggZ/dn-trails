@@ -2,47 +2,65 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <link rel="icon" type="image/png" href="./icons/dn-favicon-64.png">
     <link rel="manifest" href="./manifest.webmanifest">
     <meta name="theme-color" content="#E9ECDA">
     <link rel="apple-touch-icon" href="./icons/dn-apple-touch-180.png">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-title" content="Hiking Book">
+    <!-- iPhone app: the page runs up behind the clock / battery strip (see .site-bar padding) -->
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Hiking Book</title>
-  <script type="module" crossorigin src="./assets/index-DGG61B6U.js"></script>
-  <link rel="modulepreload" crossorigin href="./assets/version-BbUGAJUt.js">
-  <link rel="stylesheet" crossorigin href="./assets/version-CM7KxV2j.css">
-  <link rel="stylesheet" crossorigin href="./assets/index-l5_oZUM2.css">
+  <script type="module" crossorigin src="./assets/index-CY_dhe5T.js"></script>
+  <link rel="modulepreload" crossorigin href="./assets/version-DmrAvQJP.js">
+  <link rel="stylesheet" crossorigin href="./assets/version-BzQiQGeQ.css">
+  <link rel="stylesheet" crossorigin href="./assets/index-BgSjhyVq.css">
 </head>
-<body>
-    <header class="site-bar">
+<body class="explore-page">
+    <!-- Desktop: list panel on the left, map filling the rest.
+         Phone: map fills the screen, the list is a sheet pulled up from the bottom. -->
+    <header class="site-bar" id="site-bar">
         <a class="home" href="./index.html">Hiking Book</a>
         <button class="pill install-button" id="install" type="button" hidden>Install</button>
     </header>
-    <p class="install-hint" id="install-hint" hidden>
-        On iPhone or iPad: tap the Share button, then <strong>Add to Home Screen</strong>.
-    </p>
 
-    <main class="directory sheet">
-        <section class="intro">
-            <h1>Our hikes</h1>
-            <p class="lead" id="totals"></p>
-        </section>
-
-        <section class="finder" aria-label="Find hikes near a place">
-            <form class="place-search" id="place-search" role="search">
-                <svg class="place-search-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></svg>
-                <input type="search" id="place-input" name="place" placeholder="Near a place, e.g. Garmisch" autocomplete="off" enterkeyhint="search" aria-label="Place">
-                <button class="pill" type="submit">Search</button>
-            </form>
-            <p class="place-status" id="place-status" aria-live="polite" hidden></p>
+    <div class="explore">
+        <div class="explore-map">
             <div class="overview-map" id="overview-map"></div>
-            <p class="you-status" id="you-status" aria-live="polite" hidden></p>
-        </section>
+            <!-- shown when a trail on the map is tapped: that hike, then the ones nearest to it (swipe) -->
+            <div class="pick-strip" id="pick-strip" hidden>
+                <div class="pick-track" id="pick-track"></div>
+                <button class="pick-step pick-prev" type="button" aria-label="Previous hike" hidden></button>
+                <button class="pick-step pick-next" type="button" aria-label="Next hike" hidden></button>
+            </div>
+        </div>
 
-        <div class="hike-list" id="hike-list"></div>
-    </main>
+        <aside class="panel sheet" id="panel" aria-label="Hikes">
+            <!-- phones: drag or tap to pull the list up / down -->
+            <button class="panel-grip" id="panel-grip" type="button" aria-label="Show more of the list"><span></span></button>
+
+            <div class="panel-inner" id="panel-inner">
+                <header class="panel-head">
+                    <h1>Our hikes</h1>
+                    <p class="panel-totals" id="totals"></p>
+                </header>
+                <p class="install-hint" id="install-hint" hidden>
+                    On iPhone or iPad: tap the Share button, then <strong>Add to Home Screen</strong>.
+                </p>
+
+                <form class="place-search" id="place-search" role="search">
+                    <svg class="place-search-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></svg>
+                    <input type="search" id="place-input" name="place" placeholder="Near a place, e.g. Garmisch" autocomplete="off" enterkeyhint="search" aria-label="Place">
+                    <button class="pill" type="submit">Search</button>
+                </form>
+                <p class="place-status" id="place-status" aria-live="polite" hidden></p>
+                <p class="you-status" id="you-status" aria-live="polite" hidden></p>
+
+                <div class="hike-list" id="hike-list"></div>
+            </div>
+        </aside>
+    </div>
 
 </body>
 </html>
