@@ -25,16 +25,26 @@ const ICON_HOME = '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" s
  * @param onSelect (id or null) => called when a trail is picked out / cleared
  * @param onView   ({ center: [lat, lon], inView: Set of ids } or null) => called after
  *                 the reader pans or zooms; null when every hike is in view again
+ * @param options  fullscreen: false = the map already fills the screen (no preview,
+ *                   no full-screen button); insets: () => ({ top, bottom, left, right })
+ *                   px of the map that something covers (e.g. a sheet), kept clear when fitting
  */
-export function overviewMap(mapBox, hikes, onSelect = () => {}, onView = () => {}) {
+export function overviewMap(mapBox, hikes, onSelect = () => {}, onView = () => {}, options = {}) {
+    const { fullscreen = true, insets = () => ({}) } = options;
     const compact = window.matchMedia('(hover: none) and (pointer: coarse)');
     let full = false;
-    const peek = () => compact.matches && !full;
+    const peek = () => fullscreen && compact.matches && !full;
+
+    // fitBounds padding that keeps clear of whatever covers the map
+    const pad = (base) => {
+        const i = insets();
+        return { paddingTopLeft: [base + (i.left ?? 0), base + (i.top ?? 0)], paddingBottomRight: [base + (i.right ?? 0), base + (i.bottom ?? 0)] };
+    };
 
     const map = L.map(mapBox, { scrollWheelZoom: true, wheelPxPerZoomLevel: 90, zoomSnap: 0.5, worldCopyJump: true });
 
     // Full-screen button first, so it sits above the layer button (like the hike map)
-    const fullControl = new (L.Control.extend({
+    const fullControl = fullscreen && new (L.Control.extend({
         options: { position: 'topright' },
         onAdd() {
             const bar = L.DomUtil.create('div', 'leaflet-bar full-control');
@@ -47,7 +57,7 @@ export function overviewMap(mapBox, hikes, onSelect = () => {}, onView = () => {
             return bar;
         },
     }))();
-    map.addControl(fullControl);
+    if (fullControl) map.addControl(fullControl);
 
     map.addControl(new (L.Control.extend({
         options: { position: 'topleft' },
@@ -112,10 +122,20 @@ export function overviewMap(mapBox, hikes, onSelect = () => {}, onView = () => {
     map.on('click', () => { if (!peek()) select(null); });
 
     function showAll() {
-        map.fitBounds(all, { padding: [40, 40], maxZoom: 12 });
+        map.fitBounds(all, { ...pad(40), maxZoom: 12 });
         onView(null);
     }
     showAll();
+
+    // The map's box can get its real size only after this runs (styles still
+    // loading, a sheet sizing itself). Keep Leaflet in step, and until the reader
+    // or a search/location moves the map, keep showing all hikes.
+    let autoFit = true;
+    const stopAutoFit = () => { autoFit = false; };
+    new ResizeObserver(() => {
+        map.invalidateSize({ animate: false });
+        if (autoFit) map.fitBounds(all, { ...pad(40), maxZoom: 12, animate: false });
+    }).observe(mapBox);
 
     // --- tell the list what's on screen, but only after the reader moved the map
     // (not when a search or the location button moves it) ---
@@ -123,6 +143,7 @@ export function overviewMap(mapBox, hikes, onSelect = () => {}, onView = () => {
     let userMove = false;     // the current move was started by the reader
     let quiet = null;
     const touched = () => {
+        stopAutoFit();
         touching = true;
         clearTimeout(quiet);
         quiet = setTimeout(() => { touching = false; }, 700);
@@ -141,64 +162,68 @@ export function overviewMap(mapBox, hikes, onSelect = () => {}, onView = () => {
     });
 
     // --- full screen (same idea as the hike map; see src/hike/map-elevation.js section 6) ---
-    const home = mapBox.parentNode;
-    const marker = document.createComment('overview-map');
-    const overlay = document.createElement('div');
-    overlay.className = 'map-full';
-    overlay.hidden = true;
-    document.body.append(overlay); // outside .sheet: its backdrop-filter breaks position: fixed
-
-    function setInteractive(on) {
-        for (const h of ['dragging', 'touchZoom', 'doubleClickZoom', 'scrollWheelZoom', 'boxZoom', 'keyboard']) {
-            if (map[h]) map[h][on ? 'enable' : 'disable']();
-        }
-    }
-    function refresh() {
-        const btn = fullControl.button;
-        btn.innerHTML = full ? ICON_CLOSE : ICON_OPEN;
-        btn.title = full ? 'Close map' : 'Full-screen map';
-        btn.setAttribute('aria-label', btn.title);
-        mapBox.classList.toggle('map-peek', peek());
-        if (!full) setInteractive(!compact.matches);
-    }
-    function relayout() {
-        const center = map.getCenter(), zoom = map.getZoom();
-        map.invalidateSize();
-        map.setView(center, zoom, { animate: false });
-    }
-    function openFull() {
-        if (full) return;
-        full = true;
-        home.insertBefore(marker, mapBox);
-        overlay.append(mapBox);
-        overlay.hidden = false;
-        document.documentElement.classList.add('map-open');
-        setInteractive(true);
-        refresh();
-        history.pushState({ hbMap: true }, ''); // so the back button closes the map
-        relayout();
-        fullControl.button.focus({ preventScroll: true });
-    }
-    function closeFull(fromBackButton = false) {
-        if (!full) return;
-        full = false;
-        marker.replaceWith(mapBox);
+    let toggleFull = () => {}; // set up below when this map has a full-screen mode
+    if (fullscreen) setupFullScreen();
+    function setupFullScreen() {
+        const home = mapBox.parentNode;
+        const marker = document.createComment('overview-map');
+        const overlay = document.createElement('div');
+        overlay.className = 'map-full';
         overlay.hidden = true;
-        document.documentElement.classList.remove('map-open');
-        refresh();
-        relayout();
-        if (!fromBackButton && history.state?.hbMap) history.back();
-    }
-    function toggleFull() { if (full) closeFull(); else openFull(); }
+        document.body.append(overlay); // outside .sheet: its backdrop-filter breaks position: fixed
 
-    if (history.state?.hbMap) history.replaceState(null, ''); // page reloaded while the map was open
-    window.addEventListener('popstate', () => closeFull(true));
-    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeFull(); });
-    mapBox.addEventListener('click', (e) => {
-        if (peek() && !e.target.closest('.leaflet-control')) openFull();
-    });
-    compact.addEventListener('change', refresh);
-    refresh();
+        function setInteractive(on) {
+            for (const h of ['dragging', 'touchZoom', 'doubleClickZoom', 'scrollWheelZoom', 'boxZoom', 'keyboard']) {
+                if (map[h]) map[h][on ? 'enable' : 'disable']();
+            }
+        }
+        function refresh() {
+            const btn = fullControl.button;
+            btn.innerHTML = full ? ICON_CLOSE : ICON_OPEN;
+            btn.title = full ? 'Close map' : 'Full-screen map';
+            btn.setAttribute('aria-label', btn.title);
+            mapBox.classList.toggle('map-peek', peek());
+            if (!full) setInteractive(!compact.matches);
+        }
+        function relayout() {
+            const center = map.getCenter(), zoom = map.getZoom();
+            map.invalidateSize();
+            map.setView(center, zoom, { animate: false });
+        }
+        function openFull() {
+            if (full) return;
+            full = true;
+            home.insertBefore(marker, mapBox);
+            overlay.append(mapBox);
+            overlay.hidden = false;
+            document.documentElement.classList.add('map-open');
+            setInteractive(true);
+            refresh();
+            history.pushState({ hbMap: true }, ''); // so the back button closes the map
+            relayout();
+            fullControl.button.focus({ preventScroll: true });
+        }
+        function closeFull(fromBackButton = false) {
+            if (!full) return;
+            full = false;
+            marker.replaceWith(mapBox);
+            overlay.hidden = true;
+            document.documentElement.classList.remove('map-open');
+            refresh();
+            relayout();
+            if (!fromBackButton && history.state?.hbMap) history.back();
+        }
+        toggleFull = () => { if (full) closeFull(); else openFull(); };
+
+        if (history.state?.hbMap) history.replaceState(null, ''); // page reloaded while the map was open
+        window.addEventListener('popstate', () => closeFull(true));
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeFull(); });
+        mapBox.addEventListener('click', (e) => {
+            if (peek() && !e.target.closest('.leaflet-control')) openFull();
+        });
+        compact.addEventListener('change', refresh);
+        refresh();
+    }
 
     // --- searched place ---
     let placeMarker = null;
@@ -211,6 +236,26 @@ export function overviewMap(mapBox, hikes, onSelect = () => {}, onView = () => {
         map,
         showAll,
         clearPlace,
+
+        /** Pick out a hike (or null to clear), as if its trail was clicked. */
+        select(id) { select(id); },
+
+        /** Move the map only if this hike isn't on screen (e.g. swiped to on the cards). */
+        keepInView(id) {
+            const t = trails.get(id);
+            if (!t || map.getBounds().contains(t.bounds)) return;
+            stopAutoFit();
+            const view = L.latLngBounds(t.bounds);
+            // keep the previously shown area too when it's close, so the hop isn't jarring
+            map.flyToBounds(view, { ...pad(40), maxZoom: Math.max(map.getZoom(), 9), duration: 0.6 });
+        },
+
+        /** Bring a hike into view (keeps clear of the insets). */
+        showHike(id) {
+            stopAutoFit();
+            const t = trails.get(id);
+            if (t) map.flyToBounds(t.bounds, { ...pad(40), maxZoom: 14, duration: 0.6 });
+        },
 
         /** A row in the list is hovered: make its trail stand out. */
         highlight(id, on) {
@@ -229,13 +274,15 @@ export function overviewMap(mapBox, hikes, onSelect = () => {}, onView = () => {
 
         /** Show these hikes (and a point, e.g. you) on the map. */
         fitTo(ids, point) {
+            stopAutoFit();
             const view = L.latLngBounds(point ? [point] : []);
             for (const id of ids) view.extend(trails.get(id).bounds);
-            map.flyToBounds(view, { padding: [40, 40], maxZoom: 15, duration: 0.8 });
+            map.flyToBounds(view, { ...pad(40), maxZoom: 15, duration: 0.8 });
         },
 
         /** Mark the searched place and show it together with the closest hike. */
         showPlace(place, nearest) {
+            stopAutoFit();
             clearPlace();
             placeMarker = L.marker([place.lat, place.lon], {
                 icon: L.divIcon({
@@ -252,7 +299,9 @@ export function overviewMap(mapBox, hikes, onSelect = () => {}, onView = () => {
             const t = nearest && trails.get(nearest.id);
             if (t) view.extend(t.bounds);
             // extra room at the top for the name
-            map.flyToBounds(view, { paddingTopLeft: [60, 70], paddingBottomRight: [60, 40], maxZoom: 12, duration: 0.8 });
+            const p = pad(50);
+            p.paddingTopLeft[1] += 20;
+            map.flyToBounds(view, { ...p, maxZoom: 12, duration: 0.8 });
         },
     };
 }

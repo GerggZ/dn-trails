@@ -1,28 +1,288 @@
-.directory {
-    padding: 0 var(--gutter) 64px;
+/* Main page (index.html).
+   Desktop: list panel on the left, map filling the rest.
+   Phone: map fills the screen, the list is a sheet pulled up from the bottom (height set in directory.js). */
+
+.explore-page { overflow: hidden; }
+.explore-page .site-bar {
+    max-width: none;
+    padding: 12px var(--gutter);
 }
 
-/* --- Intro --- */
-.intro {
-    padding: clamp(24px, 6vw, 72px) 0 clamp(28px, 5vw, 56px);
-    max-width: 34rem;
+.explore {
+    --frame: clamp(10px, 2.2vw, 28px); /* photo showing around the map */
+    position: relative;
+    height: calc(100vh - var(--bar-h, 60px));
+    height: calc(100dvh - var(--bar-h, 60px));
 }
 
-.intro h1 {
-    font-size: var(--step-5);
-    font-weight: 700;
+/* ---------- the map ---------- */
+/* Inset with rounded corners, so the background photo frames it (like the old sheet) */
+.explore-map { position: absolute; inset: 0 var(--frame) var(--frame); }
+.explore-map .overview-map {
+    position: absolute !important; /* Leaflet sets position: relative inline */
+    inset: 0;
+    height: auto;
+    margin: 0;
+    border-radius: var(--radius-sheet);
+    border: 1px solid color-mix(in srgb, var(--ink) 14%, transparent);
+    box-shadow: 0 20px 60px color-mix(in srgb, var(--ink) 28%, transparent);
+    overflow: hidden;
 }
 
-.lead {
-    margin: 14px 0 0;
+/* ---------- the list panel ---------- */
+.panel.sheet {
+    position: absolute;
+    z-index: 900; /* above the map's controls */
+    display: flex;
+    flex-direction: column;
+    width: auto;
+    max-width: none;
+    margin: 0;
+    box-shadow: 0 12px 40px color-mix(in srgb, var(--ink) 25%, transparent);
+}
+.panel-inner {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 0 18px 24px;
+}
+.panel-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 16px 0 12px;
+}
+.panel-head h1 { font-size: var(--step-3); font-weight: 700; }
+.panel-totals {
+    margin: 0;
+    font-family: var(--font-sign);
+    font-size: var(--step--1);
+    font-weight: 500;
+    color: var(--ink-soft);
+    white-space: nowrap;
+}
+.panel .place-search { max-width: none; }
+.panel .you-status { margin-top: 10px; }
+.panel .app-version { padding: 18px 0 4px; }
+.panel .install-hint { max-width: none; margin: 0 0 10px; padding: 0; text-align: left; }
+
+.panel-grip { display: none; }
+
+/* Desktop: a floating panel on the left, map behind and to the right */
+@media (min-width: 900px) {
+    .panel.sheet {
+        top: 12px;
+        bottom: calc(var(--frame) + 12px);
+        left: calc(var(--frame) + 12px);
+        width: 410px;
+    }
+    /* keep the map's left controls clear of the panel */
+    .explore-map .leaflet-top.leaflet-left { left: 422px; }
+}
+
+/* Phone: the panel is a sheet pulled up from the bottom (height set by JS) */
+@media (max-width: 899px) {
+    .explore { --frame: 8px; }
+    .explore-map { bottom: 0; }
+    .explore-map .overview-map { border-bottom: 0; border-radius: 16px 16px 0 0; }
+    .panel.sheet {
+        left: 0;
+        right: 0;
+        bottom: 0;
+        border-bottom: 0;
+        border-radius: 18px 18px 0 0;
+        transition: height 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+        padding-bottom: env(safe-area-inset-bottom);
+    }
+    .panel.sheet.no-anim { transition: none; }
+    .panel-grip {
+        display: grid;
+        place-items: center;
+        flex: none;
+        width: 100%;
+        height: 22px;
+        padding: 0;
+        border: 0;
+        background: none;
+        cursor: grab;
+        touch-action: none;
+    }
+    .panel-grip span {
+        width: 40px;
+        height: 5px;
+        border-radius: 3px;
+        background: color-mix(in srgb, var(--ink) 30%, transparent);
+    }
+    .panel-head { padding-top: 2px; touch-action: none; }
+    .panel-inner { padding: 0 16px 20px; }
+    .panel[data-state="min"] .panel-inner { overflow: hidden; }
+    /* list pulled all the way up: the map's buttons would peek out under it */
+    .explore.list-full .leaflet-control-container { display: none; }
+    /* the map's bottom bits (credit) sit above the sheet */
+    .explore-map .leaflet-bottom { bottom: var(--sheet-h, 0px); }
+}
+
+/* ---------- compact rows ---------- */
+.panel .hike-list { gap: 0; margin-top: 12px; }
+.panel .hike-row {
+    grid-template-columns: 76px minmax(0, 1fr);
+    gap: 12px;
+    padding: 10px 8px;
+    margin: 0 -8px;
+    border-radius: 10px;
+    transition: background-color 0.15s ease, opacity 0.25s ease, filter 0.25s ease;
+}
+.panel .hike-row + .hike-row { border-top: 1px solid var(--rule); }
+.panel .hike-row:hover { background: color-mix(in srgb, var(--paper) 55%, transparent); }
+.panel .hike-row.picked { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.panel .hike-visual { aspect-ratio: 4 / 3; border-radius: 7px; }
+.panel .hike-title {
     font-size: var(--step-1);
-    line-height: 1.45;
+    line-height: 1.1;
+    text-underline-offset: 4px;
+    text-decoration-thickness: 2px;
+}
+.panel .hike-away { margin-top: 2px; font-size: var(--step--1); }
+.panel .hike-facts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 12px;
+    margin-top: 4px;
+    font-size: var(--step--1);
+    font-weight: 500;
     color: var(--ink-soft);
 }
+.panel .hike-facts .fact-icon { width: 0.9em; height: 0.9em; }
 
-/* --- Find hikes near a place + the map of all hikes --- */
-.finder { margin: 0 0 clamp(28px, 4vw, 44px); }
+/* ---------- cards for a tapped trail (swipe for the nearest hikes) ---------- */
+.pick-strip {
+    position: absolute;
+    z-index: 800;
+    animation: pick-in 0.22s ease-out;
+}
+.pick-strip[hidden] { display: none; }
+@keyframes pick-in { from { opacity: 0; transform: translateY(8px); } }
 
+.pick-track {
+    display: flex;
+    gap: 10px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scroll-padding-inline: 10px;
+    padding: 10px 10px 16px; /* room for the cards' shadow (scrolling boxes clip it) */
+    scrollbar-width: none;
+    overscroll-behavior-x: contain;
+}
+.pick-track::-webkit-scrollbar { display: none; }
+
+.pick-card {
+    position: relative;
+    flex: none;
+    scroll-snap-align: start;
+    display: grid;
+    grid-template-columns: 104px minmax(0, 1fr);
+    gap: 14px;
+    align-items: center;
+    padding: 12px 38px 12px 12px;
+    background: color-mix(in srgb, var(--paper) 95%, transparent);
+    border: 1px solid color-mix(in srgb, var(--ink) 14%, transparent);
+    border-radius: 14px;
+    box-shadow: 0 4px 12px color-mix(in srgb, var(--ink) 18%, transparent);
+}
+
+.pick-visual { position: relative; aspect-ratio: 4 / 3; border-radius: 8px; overflow: hidden; }
+.pick-title { font-size: var(--step-2); line-height: 1.05; }
+.pick-card .hike-facts { margin-top: 6px; font-size: var(--step-0); }
+.pick-card .hike-away { margin-top: 2px; }
+.pick-actions { display: flex; align-items: center; gap: 14px; margin-top: 10px; }
+.pick-open { text-decoration: none; }
+.pick-zoom {
+    padding: 0;
+    border: 0;
+    background: none;
+    font-family: var(--font-sign);
+    font-size: var(--step-0);
+    font-weight: 600;
+    color: var(--ink-soft);
+    cursor: pointer;
+}
+.pick-zoom:hover { color: var(--accent); }
+.pick-close {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: none;
+    color: var(--ink-soft);
+    cursor: pointer;
+}
+.pick-close:hover { background: color-mix(in srgb, var(--ink) 8%, transparent); color: var(--ink); }
+
+/* no dark tap box on phones */
+.pick-card a, .pick-card button, .pick-step, .panel-grip, .hike-row { -webkit-tap-highlight-color: transparent; }
+
+/* previous / next (mouse users; fingers just swipe) */
+.pick-step {
+    position: absolute;
+    top: calc(50% - 5px);
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 1px solid color-mix(in srgb, var(--ink) 18%, transparent);
+    border-radius: 50%;
+    background: var(--paper);
+    color: var(--ink);
+    box-shadow: 0 2px 8px color-mix(in srgb, var(--ink) 18%, transparent);
+    transform: translateY(-50%);
+    cursor: pointer;
+}
+.pick-step[hidden] { display: none; }
+.pick-prev { left: -6px; }
+.pick-prev svg { transform: scaleX(-1); }
+.pick-next { right: -6px; }
+
+@media (min-width: 900px) {
+    .pick-strip { left: 436px; right: 28px; bottom: 24px; }
+    .pick-card { width: min(540px, calc(100% - 60px)); }
+}
+@media (max-width: 899px) {
+    .pick-strip { left: 0; right: 0; bottom: calc(var(--sheet-h, 0px) - 4px); }
+    .pick-step { display: none; }
+    /* slimmer on phones; the next card peeks in at the right edge */
+    .pick-card {
+        width: calc(100% - 48px);
+        grid-template-columns: 64px minmax(0, 1fr);
+        gap: 10px;
+        padding: 8px;
+        border-radius: 12px;
+    }
+    .pick-visual { border-radius: 6px; }
+    .pick-title {
+        padding-right: 26px; /* the × */
+        font-size: var(--step-1);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .pick-card .hike-facts { flex-wrap: nowrap; overflow: hidden; margin-top: 2px; font-size: var(--step--1); gap: 0 8px; }
+    .pick-card .fact { gap: 3px; }
+    .pick-actions { gap: 12px; margin-top: 6px; }
+    .pick-open { padding: 2px 12px; font-size: var(--step--1); }
+    .pick-zoom { font-size: var(--step--1); }
+    .pick-card .hike-away { font-size: var(--step--1); margin-top: 0; }
+}
+
+/* ---------- search box ---------- */
 .place-search {
     display: flex;
     align-items: center;
@@ -70,57 +330,10 @@
     cursor: pointer;
 }
 
-.overview-map {
-    height: clamp(260px, 42vh, 420px);
-    margin-top: 16px;
-    border-radius: var(--radius);
-    background: var(--paper-deep);
-    z-index: 0;
-}
+
+/* ---------- map bits ---------- */
 .overview-place { background: none; border: 0; }
 
-
-/* Phones: the map on the page is a preview; a tap opens it full screen
-   (same as the hike map). Only the full-screen button shows on it. */
-.overview-map.map-peek { cursor: pointer; touch-action: pan-y; }
-.overview-map.map-peek .leaflet-control:not(.full-control):not(.leaflet-control-attribution) { display: none; }
-.full-control .full-button svg,
-.home-control .home-button svg { display: block; }
-
-html.map-open, html.map-open body { overflow: hidden; }
-
-.map-full {
-    position: fixed;
-    inset: 0;
-    z-index: 950;
-    height: 100vh;
-    height: 100dvh;
-    background: var(--paper);
-}
-.map-full[hidden] { display: none; }
-.map-full .overview-map {
-    /* !important: Leaflet sets position: relative inline */
-    position: absolute !important;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    margin: 0;
-    border-radius: 0;
-}
-.map-full .leaflet-top { top: env(safe-area-inset-top); }
-.map-full .leaflet-bottom { bottom: env(safe-area-inset-bottom); }
-.overview-tip {
-    padding: 2px 8px;
-    border: 1px solid color-mix(in srgb, var(--ink) 22%, transparent);
-    border-radius: 6px;
-    background: color-mix(in srgb, var(--paper) 94%, transparent);
-    box-shadow: 0 1px 3px color-mix(in srgb, var(--ink) 18%, transparent);
-    color: var(--ink);
-    font-family: var(--font-sign);
-    font-size: 14px;
-    font-weight: 600;
-}
-.overview-tip::before { display: none; }
 
 /* --- "You're at …" line under the map (same look as on a hike page) --- */
 .you-status {
@@ -148,7 +361,7 @@ html.map-open, html.map-open body { overflow: hidden; }
 }
 .you-status[hidden] { display: none; }
 
-/* --- List of hikes: small picture left, name and numbers right --- */
+/* ---------- rows (sizes for the panel are above) ---------- */
 .hike-list {
     display: flex;
     flex-direction: column;
@@ -218,21 +431,3 @@ html.map-open, html.map-open body { overflow: hidden; }
 .hike-row:focus-visible .hike-title { text-decoration-color: var(--accent); }
 .hike-row:hover .card-art img { transform: scale(1.035); }
 
-/* Phones: numbers as a 2×2 — distance + time on top, up + down together below */
-@media (max-width: 720px) {
-    .overview-map { height: 240px; margin-top: 12px; }
-    .place-search { max-width: none; }
-    .hike-row { grid-template-columns: 120px minmax(0, 1fr); gap: 14px; }
-    .hike-visual { border-radius: 8px; }
-    .hike-title { font-size: var(--step-1); }
-    .hike-facts {
-        display: grid;
-        grid-template-columns: repeat(2, max-content);
-        gap: 0 16px;
-        margin-top: 6px;
-        font-size: var(--step-0);
-    }
-    .hike-facts .fact:nth-child(4) { order: 1; }
-    .hike-facts .fact:nth-child(2),
-    .hike-facts .fact:nth-child(3) { order: 2; }
-}

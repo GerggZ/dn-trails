@@ -27,6 +27,7 @@ function renderHero(hike) {
     const profile = resample(hike.track.dist_km, hike.track.ele_m, 160);
     // The main photo if one was chosen, otherwise a landscape drawn from the hike's profile
     art.append(hike.cover_src ? el('img', { src: asset(hike.cover_src), alt: '' }) : scenery(profile, hike.id));
+    hero.classList.toggle('hero-scenery', !hike.cover_src);
     const ridge = cutOut(art, profile, { band: 0.42, relief: 0.7 });
     hero.append(art, ridge);
 }

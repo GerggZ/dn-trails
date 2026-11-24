@@ -11,6 +11,11 @@
     position: relative;
     height: clamp(240px, 52vh, 540px);
 }
+/* Generated landscape (no cover photo): a wide, landscape-shaped strip.
+   Follows the width (≈16:9 on a phone), capped by screen height on desktop. */
+.hero.hero-scenery {
+    height: clamp(170px, min(56vw, 38vh), 380px);
+}
 
 /* --- Page column --- */
 .page {

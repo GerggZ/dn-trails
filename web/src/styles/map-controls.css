@@ -48,6 +48,15 @@
 .leaflet-bar a:first-child { border-radius: 0; }
 .leaflet-bar a + a { border-top: 1px solid var(--ctl-border); }
 
+/* No box on tap/click: phones draw a dark tap highlight over links, and some
+   browsers outline a clicked link. Keyboard focus still gets the olive ring (base.css). */
+.leaflet-control a,
+.leaflet-control button { -webkit-tap-highlight-color: transparent; }
+.leaflet-control a:focus:not(:focus-visible),
+.leaflet-control button:focus:not(:focus-visible) { outline: none; }
+/* Leaflet greys a focused button; only do that for keyboard focus */
+.leaflet-bar a:focus:not(:focus-visible):not(:hover) { background-color: transparent; }
+
 .leaflet-bar a:hover,
 .leaflet-bar a:focus-visible,
 .locate-control .locate-button:hover,
