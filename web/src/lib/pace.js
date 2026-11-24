@@ -4,6 +4,7 @@
 
 import { APP_CONFIG } from '../config.js';
 import { el } from './data.js';
+import { TORTOISE, HIKER, HARE, CRITTERS } from './pace-icons.js';
 
 const KEY = 'hb-pace';
 const EVENT = 'hb-pace-change';
@@ -56,8 +57,40 @@ function paceText(p) {
     return p > def ? `${pct}% faster than average` : `${pct}% slower than average`;
 }
 
-const tortoise = '<svg viewBox="0 0 34 20" aria-hidden="true"><path d="M5 14.5C5 8 10 4 16 4s11 4 11 10.5z"/><circle cx="29.5" cy="12" r="2.8"/><rect x="7.5" y="14" width="3.4" height="4.5" rx="1.2"/><rect x="19.5" y="14" width="3.4" height="4.5" rx="1.2"/><path d="M5.5 13 2 14.8l3.6.6z"/></svg>';
-const hare = '<svg viewBox="0 0 34 20" aria-hidden="true"><ellipse cx="14" cy="13" rx="9" ry="5.2"/><circle cx="24.5" cy="9.5" r="3.6"/><path d="M23 7.2c-1.6-3.6-1-6.6.6-6.4 1.4.2 1.6 3.3 1.3 6.2z"/><path d="M25.4 7c.2-3.8 1.9-6.3 3.3-5.7 1.3.6.2 3.6-1.6 6.3z"/><circle cx="4.6" cy="10.6" r="2.3"/><rect x="18" y="16" width="7" height="2.6" rx="1.3"/><rect x="7" y="16" width="5" height="2.6" rx="1.3"/></svg>';
+// Which drawings the slider uses:
+//   'silhouette' – Gregg's tortoise / hiker / hare (traced from his PNG, lib/pace-icons.js)
+//   'drawn'      – the earlier hand-made ones (stick hiker with a growing stride)
+const ICON_STYLE = 'silhouette';
+
+// The ground: false = no line and no middle post, just the footprints (Gregg's pick)
+const GROUND_LINE = false;
+// Critters along the path (Gregg's silhouettes, lib/pace-icons.js):
+// [name, where along the track 0…1, px from the ground up to its feet (0 = on the
+// ground, more = hovering), its height in px]. Also there: ladybug.
+const PATH_CRITTERS = [
+    ['snail', 0.06, 0, 8],
+    ['bumblebee', 0.2, 15, 9],
+    ['hedgehog', 0.32, 0, 8],
+    ['butterfly', 0.45, 17, 10],
+    ['squirrel', 0.7, 0, 11],
+    ['dragonfly', 0.9, 14, 9],
+];
+
+// Tortoise and hare at ONE common scale (as drawn side by side in the PNG, where they're
+// equally wide), not each fitted to the same box – that made the flat tortoise look small.
+// The taller one (the hare) sets the scale.
+const ICON_PX = 24; // px height of the tallest animal
+const iconSvg = ({ w, h, d }) => {
+    const k = ICON_PX / Math.max(TORTOISE.h, HARE.h);
+    return `<svg viewBox="0 0 ${w} ${h}" style="width:${(w * k).toFixed(1)}px;height:${(h * k).toFixed(1)}px" aria-hidden="true">`
+        + `<path fill-rule="evenodd" d="${d}"/></svg>`;
+};
+
+const drawnTortoise = '<svg viewBox="0 0 34 20" aria-hidden="true"><path d="M5 14.5C5 8 10 4 16 4s11 4 11 10.5z"/><circle cx="29.5" cy="12" r="2.8"/><rect x="7.5" y="14" width="3.4" height="4.5" rx="1.2"/><rect x="19.5" y="14" width="3.4" height="4.5" rx="1.2"/><path d="M5.5 13 2 14.8l3.6.6z"/></svg>';
+const drawnHare = '<svg viewBox="0 0 34 20" aria-hidden="true"><ellipse cx="14" cy="13" rx="9" ry="5.2"/><circle cx="24.5" cy="9.5" r="3.6"/><path d="M23 7.2c-1.6-3.6-1-6.6.6-6.4 1.4.2 1.6 3.3 1.3 6.2z"/><path d="M25.4 7c.2-3.8 1.9-6.3 3.3-5.7 1.3.6.2 3.6-1.6 6.3z"/><circle cx="4.6" cy="10.6" r="2.3"/><rect x="18" y="16" width="7" height="2.6" rx="1.3"/><rect x="7" y="16" width="5" height="2.6" rx="1.3"/></svg>';
+
+const tortoise = ICON_STYLE === 'silhouette' ? iconSvg(TORTOISE) : drawnTortoise;
+const hare = ICON_STYLE === 'silhouette' ? iconSvg(HARE) : drawnHare;
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const svg = (tag, attrs = {}) => {
@@ -75,6 +108,17 @@ const SOLE = 'M3.6 -2.1C6.5 -2.9 9.6 -2.4 10.4 -0.6 11 0.8 9.8 2.2 6.8 2.4 4.9 2
  * the stride opens up and the hiker leans forward the faster it goes.
  */
 function drawHiker(group, x, ground, t) {
+    if (ICON_STYLE === 'silhouette') {
+        // Gregg's hiker, feet on the ground line; leans forward (0° → 8°) towards the hare
+        const height = 24;
+        const k = height / HIKER.h;
+        const lean = 8 * t;
+        const p = svg('path', { class: 'hiker-fill', 'fill-rule': 'evenodd', d: HIKER.d });
+        p.setAttribute('transform',
+            `translate(${x.toFixed(1)} ${ground.toFixed(1)}) rotate(${lean.toFixed(1)}) scale(${k.toFixed(4)}) translate(${(-HIKER.w / 2).toFixed(1)} ${-HIKER.h})`);
+        group.replaceChildren(p);
+        return;
+    }
     const leg = 4 + 9 * t;            // stride width
     const lean = 4 + 8 * t;           // degrees forward
     const hip = ground - 9;
@@ -109,12 +153,19 @@ export function paceSlider() {
     const post = svg('line', { class: 'pace-post' });     // "average" in the middle
     const prints = svg('g', { class: 'pace-prints' });
     const hiker = svg('g', { class: 'pace-hiker' });
-    scene.append(path, post, prints, hiker);
+    const critters = svg('g', { class: 'pace-critters' });
+    critters.innerHTML = PATH_CRITTERS.map(([name, , , height]) => {
+        const c = CRITTERS[name];
+        const k = height / c.h;
+        const paths = c.parts.map(([d, light]) => `<path class="${light ? 'cw' : 'c'}" fill-rule="evenodd" d="${d}"/>`).join('');
+        return `<g><g transform="translate(${(-c.w * k / 2).toFixed(1)} ${-height}) scale(${k.toFixed(4)})">${paths}</g></g>`;
+    }).join('');
+    scene.append(critters, ...(GROUND_LINE ? [path, post] : []), prints, hiker);
     const track = el('div', { className: 'pace-track' }, scene, input);
 
     const slow = el('span', { className: 'pace-icon pace-slow', innerHTML: tortoise });
     const fast = el('span', { className: 'pace-icon pace-fast', innerHTML: hare });
-    const box = el('div', { className: 'pace' }, slow, track, fast);
+    const box = el('div', { className: `pace pace-${ICON_STYLE}` }, slow, track, fast);
 
     const HANDLE = 30; // px, width of the (invisible) range handle, see .pace-range in hike.css
 
@@ -130,15 +181,26 @@ export function paceSlider() {
         for (const [k, v] of Object.entries({ x1: 4, x2: w - 4, y1: ground + 1.5, y2: ground + 1.5 })) path.setAttribute(k, v);
         for (const [k, v] of Object.entries({ x1: w / 2, x2: w / 2, y1: ground - 5, y2: ground + 1.5 })) post.setAttribute(k, v);
 
+        PATH_CRITTERS.forEach(([, at, up], i) => { // feet (bottom middle) at this spot
+            critters.children[i].setAttribute('transform', `translate(${(at * w).toFixed(1)} ${(ground - up).toFixed(1)})`);
+        });
+
         // Footprints behind the hiker: stride 6 px (tortoise) … 17 px (hare), older ones fade
         prints.replaceChildren();
         let px = 6;
         let left = true;
+        // The hiker steps around critters sitting on the path: no prints over them
+        const onPath = PATH_CRITTERS.filter(([, , up]) => up === 0).map(([name, at, , height]) => {
+            const c = CRITTERS[name];
+            return [at * w, (c.w * height) / c.h / 2 + 4]; // middle, half width + a little room
+        });
         while (px < x - 10) {
             const f = px / w;
             const scale = 0.5 + 0.3 * f;
-            const y = ground - 2 + (left ? -2 : 2);
-            prints.append(svg('path', {
+            // without a ground line the prints sit a bit higher, clear of the hiker's feet
+            const y = ground - (GROUND_LINE ? 2 : 5) + (left ? -2 : 2);
+            const blocked = onPath.some(([cx, half]) => Math.abs(px - cx) < half);
+            if (!blocked) prints.append(svg('path', {
                 d: SOLE,
                 transform: `translate(${px.toFixed(1)},${y.toFixed(1)}) scale(${scale.toFixed(2)}${left ? `,-${scale.toFixed(2)}` : ''}) translate(-5,0)`,
                 opacity: (0.2 + 0.55 * (px / Math.max(x, 1))).toFixed(2),

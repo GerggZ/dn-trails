@@ -27,10 +27,61 @@ const slopeColor = (() => {
 const SLICE_STEP = 1.5; // px length of one slice
 const SETTLE_MS = 150; // after the last zoom/slide frame, swap the quick line for the slices
 
-/** Steepness at a point for the readout: "+12%", "−8%" or "flat". */
+/** Climb and descent for the bar under the profile: "↑ 610 m  ↓ 120 m" (metres in). */
+function climbText(upM, downM) {
+    const f = (m) => Math.round(elev(m)).toLocaleString('en');
+    return `↑ ${f(upM)} ${elevUnit()}   ↓ ${f(downM)} ${elevUnit()}`;
+}
+
+/** Height difference to the start for the readout: "+430 m", "−120 m", "±0 m". */
+function fromStartText(diff) {
+    const r = Math.round(diff);
+    if (r === 0) return `±0 ${elevUnit()}`;
+    return `${r > 0 ? '+' : '−'}${Math.abs(r).toLocaleString('en')} ${elevUnit()}`;
+}
+
+/** Steepness for the readout, without a sign ("12%" or "flat"): the wedge shows up or down. */
 function gradeText(point) {
-    const g = Math.round(point.grade);
-    return Math.abs(g) < 1 ? 'flat' : `${g > 0 ? '+' : '−'}${Math.abs(g)}%`;
+    const g = Math.abs(Math.round(point.grade));
+    return g < 1 ? 'flat' : `${g}%`;
+}
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
+function svgIcon(w, h, viewBox, inner) {
+    const svg = document.createElementNS(SVG_NS, 'svg');
+    svg.setAttribute('width', w);
+    svg.setAttribute('height', h);
+    svg.setAttribute('viewBox', viewBox);
+    svg.setAttribute('aria-hidden', 'true');
+    svg.innerHTML = inner;
+    return svg;
+}
+
+/**
+ * Slope wedge for the readout: a small triangle rising (uphill) or falling
+ * (downhill, high on the left) in the direction of walking, in the profile's
+ * slope color. The angle is exaggerated ×3 (capped at 45°), so gentle trail
+ * still shows a tilt; flat = a thin line.
+ */
+function slopeWedge(gradePct) {
+    const fill = slopeColor(gradePct);
+    if (Math.abs(Math.round(gradePct)) < 1) {
+        return svgIcon(14, 9, '0 0 18 10', `<path d="M1 8.2H17V9H1Z" fill="${fill}"/>`);
+    }
+    const angle = Math.min(Math.atan(Math.abs(gradePct) / 100) * 3, Math.PI / 4);
+    const top = (9 - Math.min(Math.tan(angle) * 16, 8)).toFixed(2);
+    const d = gradePct > 0 ? `M1 9H17V${top}Z` : `M1 ${top}L1 9H17Z`;
+    return svgIcon(14, 9, '0 0 18 10', `<path d="${d}" fill="${fill}"/>`);
+}
+
+/** Height-from-start mark: the trailhead disc, a short line, then an arrow up or down. */
+function fromStartIcon(diff) {
+    const up = diff >= 0;
+    const base = up ? 9 : 3;
+    return svgIcon(13, 11, '0 0 14 12',
+        `<circle cx="3" cy="${base}" r="2.4" style="fill:var(--ink)"/>`
+        + `<path d="M5.5 ${base}H8.5M10.5 ${base}V${up ? 2 : 10}" fill="none" stroke="currentColor" stroke-width="1.3"/>`
+        + `<path d="M8.5 ${up ? 3.8 : 8.2}L10.5 ${up ? 1.6 : 10.4}L12.5 ${up ? 3.8 : 8.2}" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>`);
 }
 
 export function renderMapAndElevation(hike) {
@@ -67,6 +118,24 @@ export function renderMapAndElevation(hike) {
         }
         return g;
     })();
+
+    // Climb and descent from the start up to each point, in metres, counted the
+    // same way as the stats (tools/hikebook/metrics.py: wiggles under 3 m ignored),
+    // so at the end they add up to the hike's ascent / descent
+    const ASCENT_NOISE_M = 3;
+    const upTo = new Float64Array(t.ele_m.length);
+    const downTo = new Float64Array(t.ele_m.length);
+    {
+        let ref = t.ele_m[0], up = 0, down = 0;
+        for (let i = 1; i < t.ele_m.length; i++) {
+            const diff = t.ele_m[i] - ref;
+            if (diff >= ASCENT_NOISE_M) { up += diff; ref = t.ele_m[i]; }
+            else if (diff <= -ASCENT_NOISE_M) { down -= diff; ref = t.ele_m[i]; }
+            upTo[i] = up;
+            downTo[i] = down;
+        }
+    }
+    const last = t.ele_m.length - 1;
 
     // --- 1. FORMAT DATA (converted to the display units once) ---
     const data = t.dist_km.map((d, i) => ({
@@ -185,12 +254,16 @@ export function renderMapAndElevation(hike) {
     function updateProgress(point) {
         const d = point ? point.distance : 0;
         const i = point ? point.index : 0;
-        const label = (distance, hours) => [
-            el('b', { textContent: `${Math.max(0, distance).toFixed(1)} ${distUnit()}` }),
-            hasTimes(hike) && hours * 60 >= 2.5 ? ` · ${fmtWalk(hours)}` : null,
+        const label = (distance, hours, upM, downM) => [
+            el('div', {},
+                el('b', { textContent: `${Math.max(0, distance).toFixed(1)} ${distUnit()}` }),
+                hasTimes(hike) && hours * 60 >= 2.5 ? ` · ${fmtWalk(hours)}` : null,
+            ),
+            el('div', { className: 'progress-climb', textContent: climbText(upM, downM) }),
         ];
-        progDone.replaceChildren(...(point ? label(d, hasTimes(hike) ? hoursBetween(hike, 0, i) : 0) : []));
-        progLeft.replaceChildren(...label(totalDistance - d, hasTimes(hike) ? hoursToEnd(hike, i) : 0));
+        progDone.replaceChildren(...(point ? label(d, hasTimes(hike) ? hoursBetween(hike, 0, i) : 0, upTo[i], downTo[i]) : []));
+        progLeft.replaceChildren(...label(totalDistance - d, hasTimes(hike) ? hoursToEnd(hike, i) : 0,
+            upTo[last] - upTo[i], downTo[last] - downTo[i]));
         progFill.style.width = `${totalDistance > 0 ? (100 * d) / totalDistance : 0}%`;
     }
     updateProgress(null);
@@ -226,10 +299,7 @@ export function renderMapAndElevation(hike) {
             dimmed = zoomed;
             fadeTrail(zoomed ? DIM : 1);
         }
-        // Only redrawn when the visible stretch really changed. And not while the map is
-        // flying / zoom-animating: Leaflet then moves the whole trail layer as a scaled
-        // picture, and a line redrawn in between lands in the wrong place until the
-        // animation ends (the bold stretch "stayed put, then snapped"). Then it waits for moveend.
+        // Only redrawn when the visible stretch really changed
         const key = zoomed ? `${view[0]}|${view[1]}` : '';
         if (key === stretchKey) return;
         stretchKey = key;
@@ -240,11 +310,7 @@ export function renderMapAndElevation(hike) {
             pts = [latLngAt(view[0]), ...latlngs.slice(i0, i1), latLngAt(view[1])];
         }
         if (!pts.length && fadeFrame != null) clearAfterFade = true; // un-dimming: keep the bold part until the fade is done
-        else if (map._animatingZoom) pendingStretch = pts;
-        else {
-            pendingStretch = null;
-            stretchLine.setLatLngs(pts);
-        }
+        else stretchLine.setLatLngs(pts);
     }
     // Dimming the rest of the trail: a short fade
     const FADE_MS = 220;
@@ -271,13 +337,6 @@ export function renderMapAndElevation(hike) {
         fadeFrame = requestAnimationFrame(step);
     }
     let stretchKey = '';
-    let pendingStretch = null; // waiting for the map animation to finish
-    function applyPendingStretch() {
-        if (!pendingStretch) return;
-        stretchLine.setLatLngs(pendingStretch);
-        pendingStretch = null;
-    }
-    map.on('moveend', applyPendingStretch);
 
     const [minElev, maxElev] = d3.extent(data, (d) => d.elevation);
     const elevPad = maxElev - minElev === 0 ? 50 : (maxElev - minElev) * 0.2;
@@ -332,7 +391,7 @@ export function renderMapAndElevation(hike) {
 
         const plot = svg.append('g').attr('clip-path', 'url(#profile-clip)');
         const areaPath = plot.append('path').attr('fill', C.terrain);
-        // The steepness line is drawn two ways (compared on the "Slope color test" page):
+        // The steepness line is drawn two ways:
         //  - at rest: thin slices cut square across the line, so the colors change
         //    along the line's own direction, also on steep climbs (drawSlices below)
         //  - while zooming / sliding: one path with a left-to-right gradient, much
@@ -462,7 +521,8 @@ export function renderMapAndElevation(hike) {
                 },
                 closePath() {},
             };
-            d3.line().x((d) => x(d.distance)).y((d) => y(d.elevation)).curve(d3.curveMonotoneX).context(rec)(visible);
+            line.context(rec)(visible);
+            line.context(null); // back to returning path strings (for linePath)
             if (pts.length < 2) { sliceGroup.html(''); return; }
 
             // Color at each point: the smoothed steepness at that distance, blended between track points
@@ -738,8 +798,7 @@ export function renderMapAndElevation(hike) {
         youGroup.select('circle').attr('cx', x(p.distance)).attr('cy', y(p.elevation));
     }
 
-    // The map shows the part of the trail that's visible on the profile, like a
-    // calm camera (chosen on 2026-11-24 after trying several ways):
+    // The map shows the part of the trail that's visible on the profile, like a calm camera:
     //  - lazy: it stays still while the stretch fits; when the stretch nears the edge
     //    it moves just as far as needed, and zooms out only if it doesn't fit any more
     //  - glide: every move eases into place (GLIDE_SPEED of the remaining way per 1/60 s
@@ -775,7 +834,6 @@ export function renderMapAndElevation(hike) {
         // The trail lines live in an SVG drawn for the old view; draw them again for
         // this one, otherwise they lag behind and the highlighted stretch drifts off
         map.eachLayer((layer) => { if (layer instanceof L.Renderer) layer._reset(); });
-        applyPendingStretch();
     }
     function endCam() {
         if (!camMoving) return;
@@ -941,7 +999,11 @@ export function renderMapAndElevation(hike) {
             ...(nearby ? [el('div', { className: 'tooltip-waypoint', textContent: nearby.name })] : []),
             el('div', { className: 'tooltip-line' },
                 el('span', { className: 'tooltip-elev', textContent: `${Math.round(point.elevation).toLocaleString('en')} ${elevUnit()}` }),
-                el('span', { className: 'tooltip-meta', textContent: ` · ${gradeText(point)}` }),
+                el('div', { className: 'tooltip-meta' },
+                    el('div', {}, slopeWedge(point.grade), gradeText(point)),
+                    el('div', {}, fromStartIcon(point.elevation - data[0].elevation),
+                        fromStartText(point.elevation - data[0].elevation)),
+                ),
             ),
         );
         updateProgress(point);

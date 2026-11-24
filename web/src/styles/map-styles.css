@@ -1,53 +1,82 @@
 /* Map looks: recolor the map tiles only (trail, markers and location dot keep their colors).
-   One class per look: .map-style-<name>. Try them all on http://127.0.0.1:5180/map-test.html
-   (every .map-style-… class in this file shows up there automatically).
+   One class per look: .map-style-<name> (set on a layer with `look` in config.js mapLayers).
 
    filter:   grayscale / sepia / saturate / hue-rotate / contrast / brightness / invert
-   opacity:  lower = more of the paper color behind the map shows through */
+             – on each TILE, not the whole pane: phone browsers (Safari especially)
+             draw a filter on a big moving layer in chunks, and the chunk edges show
+             as a faint white grid. Per pixel the result is the same.
+   opacity:  on the whole pane (per tile, the 1 px overlap below would show as
+             darker lines) – lower = more of the paper color behind the map shows through */
 
 .map-style-original .leaflet-tile-pane { }
 
 /* Sunset wash: warm pink-peach, matches the page */
-.map-style-sunset .leaflet-tile-pane {
+.map-style-sunset .leaflet-tile {
     filter: grayscale(1) sepia(0.55) hue-rotate(-45deg) saturate(1.5) contrast(0.9) brightness(1.05);
+}
+.map-style-sunset .leaflet-tile-pane {
     opacity: 0.85;
 }
 
 /* Soft dusk: the topo colors kept, but faded and pushed toward mauve */
-.map-style-dusk .leaflet-tile-pane {
+.map-style-dusk .leaflet-tile {
     filter: saturate(0.45) hue-rotate(-35deg) contrast(0.88) brightness(1.06);
+}
+.map-style-dusk .leaflet-tile-pane {
     opacity: 0.8;
 }
 
 /* Park: like a printed national-park map – faded, warm, a little yellowed paper */
-.map-style-park .leaflet-tile-pane {
+.map-style-park .leaflet-tile {
     filter: saturate(0.4) sepia(0.35) contrast(0.95) brightness(1.03);
+}
+.map-style-park .leaflet-tile-pane {
     opacity: 0.9;
 }
 
 /* Stone: topo colors calmed down to warm neutrals, no pink (works with any page color) */
-.map-style-stone .leaflet-tile-pane {
+.map-style-stone .leaflet-tile {
     filter: saturate(0.5) sepia(0.15) contrast(0.92) brightness(1.04);
+}
+.map-style-stone .leaflet-tile-pane {
     opacity: 0.88;
 }
 
 /* Ink on paper: grayscale contours and shading, like a printed book map */
-.map-style-ink .leaflet-tile-pane {
+.map-style-ink .leaflet-tile {
     filter: grayscale(1) contrast(1.15) brightness(1.05);
+}
+.map-style-ink .leaflet-tile-pane {
     opacity: 0.7;
 }
 
 /* Blush: barely-there map, the trail does all the talking */
-.map-style-blush .leaflet-tile-pane {
+.map-style-blush .leaflet-tile {
     filter: grayscale(1) contrast(0.8) brightness(1.15);
+}
+.map-style-blush .leaflet-tile-pane {
     opacity: 0.45;
 }
 
 /* Night: dark map */
-.map-style-night .leaflet-tile-pane {
+.map-style-night .leaflet-tile {
     filter: invert(1) hue-rotate(180deg) grayscale(0.5) brightness(0.85) contrast(0.95);
 }
 
 /* The paper the map is "printed" on (shows through where opacity < 1) */
 [class*='map-style-'] .leaflet-container,
 .leaflet-container[class*='map-style-'] { background: var(--paper); }
+
+/* Seams between map tiles (white grid lines that move with the map, on every layer).
+   Leaflet 1.9 draws tiles with `mix-blend-mode: plus-lighter` (leaflet.css, against
+   hairline gaps): where two tiles overlap their colors are ADDED, so on phones
+   (Chrome Android) every slightly overlapping edge comes out nearly white.
+   Instead: draw tiles normally and grow each by 1 px, so neighbours overlap and
+   cover any gap – with normal blending the overlap is invisible.
+   Opacity sits on the whole pane, not per tile, so the overlap doesn't show as
+   darker lines either. All layers in config.js are 256 px tiles. */
+.leaflet-container .leaflet-tile-pane img.leaflet-tile {
+    mix-blend-mode: normal;
+    width: 257px !important;
+    height: 257px !important;
+}

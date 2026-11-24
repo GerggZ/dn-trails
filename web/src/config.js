@@ -76,7 +76,7 @@ export const APP_CONFIG = {
     stopNames: 'always',
 
     // Slope (%) -> color of the elevation profile line. Values in between are blended.
-    // 'warm', 'soft' or 'park' (compare them on map-test.html in `npm run dev`).
+    // 'warm' (in use), 'soft' or 'park'
     slopeScheme: 'warm',
     slopeSchemes: {
         // Warm, no pink: sage → mustard → orange → burnt orange → dark rust brown

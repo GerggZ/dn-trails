@@ -42,20 +42,31 @@ function renderHeader(hike) {
     const timeStat = hasTimes(hike)
         ? ['walking time', fmtWalk(totalHours(hike)), 'walk-time']
         : ['time', fmtDuration(s.duration_h)];
+    // No words on screen: every number explains itself (km, arrows, the peak's ▲ as on
+    // the map and profile, "5h 50m" above the walking hiker). The labels stay for
+    // screen readers only.
     const stats = [
         ['distance', fmtDist(s.distance_km)],
-        ['climb', fmtElev(s.ascent_m)],
-        ['descent', fmtElev(s.descent_m)],
-        ['highest point', fmtElev(s.max_elevation_m)],
+        // Climb and descent share one spot; the unit comes once
+        ['climb and descent', `↑${fmtElev(s.ascent_m).replace(/\s*\S+$/, '')} ↓${fmtElev(s.descent_m)}`],
+        ['highest point', fmtElev(s.max_elevation_m), null, 'peak'],
         timeStat,
         ['difficulty', hike.difficulty],
     ].filter(([, value]) => value);
 
+    const peakIcon = () => {
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.setAttribute('class', 'stat-peak');
+        svg.setAttribute('viewBox', '0 0 14 14');
+        svg.setAttribute('aria-hidden', 'true');
+        svg.innerHTML = '<path d="M7 1.5 13 12.5H1z"/>';
+        return svg;
+    };
     const statsEl = document.getElementById('stats');
-    statsEl.append(...stats.map(([label, value, id]) =>
+    statsEl.append(...stats.map(([label, value, id, icon]) =>
         el('div', { className: 'stat' },
-            el('dd', { textContent: value, ...(id ? { id } : {}) }),
-            el('dt', { textContent: label }),
+            el('dt', { className: 'visually-hidden', textContent: label }),
+            el('dd', { ...(id ? { id } : {}) }, icon === 'peak' ? peakIcon() : null, value),
         )));
 
     if (hasTimes(hike)) {
