@@ -6,7 +6,7 @@ async function getJson(path) {
     return res.json();
 }
 
-export const loadHikeIndex = () => getJson('data/hikes.json');
+export const loadHikeIndex = () => getJson('data/index.json');
 /** Photos from backgrounds/ (empty list if there are none or the file is missing). */
 export const loadBackgrounds = () => getJson('data/backgrounds.json').catch(() => []);
 export const loadHike = (id) => getJson(`data/hikes/${encodeURIComponent(id)}.json`);

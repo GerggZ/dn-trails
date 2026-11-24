@@ -17,7 +17,7 @@ const locateIcon = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden=
 
 /**
  * @param overview  what overviewMap() returned
- * @param hikes     entries of hikes.json
+ * @param hikes     entries of index.json
  * @param say       (text or null) => show a line under the search box
  */
 export function setupOverviewLocate(overview, hikes, say) {

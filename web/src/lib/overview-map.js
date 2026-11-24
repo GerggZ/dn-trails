@@ -21,7 +21,7 @@ const ICON_HOME = '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" s
 
 /**
  * @param mapBox   element for the map (it is moved into a full-screen layer and back)
- * @param hikes    entries of hikes.json (id, title, line, bbox)
+ * @param hikes    entries of index.json (id, title, line, bbox)
  * @param onSelect (id or null) => called when a trail is picked out / cleared
  * @param onView   ({ center: [lat, lon], inView: Set of ids } or null) => called after
  *                 the reader pans or zooms; null when every hike is in view again

@@ -11,7 +11,9 @@ three ground types the walking-time model knows (hikebook/timing.py):
     path      tracks, trails, gravel, dirt, rock, ...
     offtrail  no mapped way nearby
 
-The answer is saved in hikes/<id>/osm_ground.json (small, fine to commit).
+The answer is saved in hikes/<id>/osm.json (small, fine to commit). That file
+has one section per kind of OpenStreetMap data ("ground" for now), all tied
+to the same track fingerprint ("track"), so more can be added later.
 After that nothing needs the internet any more.
 
 build_hikes.py calls this by itself for hikes that don't have that file yet
@@ -40,12 +42,13 @@ from hikebook.gpx import read_gpx  # noqa: E402
 from hikebook.metrics import cumulative_distance_km  # noqa: E402
 
 # --- Settings when running this file directly ---
-REFRESH = False        # True = ask OpenStreetMap again even if osm_ground.json exists
-ONLY_HIKES: list[str] = []  # e.g. ["watzmann_umrundung"]; empty = all hikes
+REFRESH = False        # True = ask OpenStreetMap again even if osm.json exists
+ONLY_HIKES: list[str] = []  # hike ids (folder names), e.g. ["sgukal"]; empty = all hikes
 
 ROOT = Path(__file__).resolve().parents[1]
 HIKES_DIR = ROOT / "hikes"
-CACHE_NAME = "osm_ground.json"
+CACHE_NAME = "osm.json"
+OLD_CACHE_NAME = "osm_ground.json"  # name before Nov 2026; renamed automatically
 
 # Public Overpass servers, tried in this order
 OVERPASS_URLS = [
@@ -178,13 +181,22 @@ def _fingerprint(lat: np.ndarray, lon: np.ndarray) -> dict:
             "last": [round(float(lat[-1]), 5), round(float(lon[-1]), 5)]}
 
 
-def load_cached(folder: Path, lat: np.ndarray, lon: np.ndarray) -> list[str] | None:
+def _read_cache(folder: Path) -> dict | None:
     path = folder / CACHE_NAME
+    old = folder / OLD_CACHE_NAME
+    if not path.exists() and old.exists():
+        old.rename(path)
     if not path.exists():
         return None
     try:
-        cache = json.loads(path.read_text(encoding="utf-8"))
+        return json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError:
+        return None
+
+
+def load_cached(folder: Path, lat: np.ndarray, lon: np.ndarray) -> list[str] | None:
+    cache = _read_cache(folder)
+    if not cache or "ground" not in cache:
         return None
     if cache.get("track") != _fingerprint(lat, lon):
         return None  # track.gpx changed since
@@ -193,13 +205,17 @@ def load_cached(folder: Path, lat: np.ndarray, lon: np.ndarray) -> list[str] | N
 
 def fetch_and_save(folder: Path, lat: np.ndarray, lon: np.ndarray) -> list[str]:
     ground = match_ground(lat, lon, query_ways(lat, lon))
-    cache = {
+    track = _fingerprint(lat, lon)
+    cache = _read_cache(folder) or {}
+    if cache.get("track") != track:
+        cache = {}  # other sections belong to an old track: drop them
+    cache.update({
         "source": "© OpenStreetMap contributors (ODbL), via Overpass API",
         "fetched": date.today().isoformat(),
         "match_radius_m": MATCH_RADIUS_M,
-        "track": _fingerprint(lat, lon),
+        "track": track,
         "ground": runs(ground),
-    }
+    })
     (folder / CACHE_NAME).write_text(json.dumps(cache, ensure_ascii=False, indent=1), encoding="utf-8")
     return ground
 
@@ -207,13 +223,13 @@ def fetch_and_save(folder: Path, lat: np.ndarray, lon: np.ndarray) -> list[str]:
 def ground_for_hike(folder: Path, lat: np.ndarray, lon: np.ndarray, refresh: bool = False) -> tuple[list[str] | None, str]:
     """Ground type per track point, plus a short note for the build log.
 
-    Uses osm_ground.json when it's there and still matches the track, otherwise
+    Uses osm.json when it's there and still matches the track, otherwise
     asks OpenStreetMap. Returns (None, reason) if that fails.
     """
     if not refresh:
         cached = load_cached(folder, lat, lon)
         if cached is not None:
-            return cached, "ground from osm_ground.json"
+            return cached, "ground from osm.json"
     try:
         return fetch_and_save(folder, lat, lon), "ground fetched from OpenStreetMap"
     except OsmError as err:
