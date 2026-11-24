@@ -89,8 +89,9 @@ img { display: block; max-width: 100%; }
     max-width: calc(var(--page) + 2 * var(--gutter));
     margin: 0 auto;
     padding: 20px var(--gutter);
-    /* Installed on an iPhone the page runs up behind the clock: keep the title below it */
-    padding-top: calc(20px + env(safe-area-inset-top));
+    /* Full screen (Android) / behind the clock (iPhone): sit just below the
+       camera / clock instead of a full 20 px further down */
+    padding-top: max(20px, calc(env(safe-area-inset-top) + 4px));
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -341,38 +342,134 @@ img { display: block; max-width: 100%; }
     white-space: nowrap;
 }
 
-/* --- "Viewing as" demo user picker, top right of the site bar (src/lib/viewing-as.js) --- */
-.site-bar .install-button { margin-left: auto; }
-.viewing-as {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
+/* --- Profile button (top right of the site bar) + side menu (src/lib/profile-menu.js) --- */
+.site-bar .install-button,
+.site-bar .back { margin-left: auto; }
+
+.avatar {
+    display: inline-grid;
+    place-items: center;
+    flex: none;
+    border-radius: 50%;
     font-family: var(--font-sign);
-    font-size: var(--step--1);
-    font-weight: 500;
-    white-space: nowrap;
-}
-.viewing-as label { opacity: 0.75; }
-.viewing-as-select {
-    font: inherit;
     font-weight: 600;
-    color: var(--ink);
-    padding: 3px 8px;
-    border-radius: 6px;
-    border: 1px solid color-mix(in srgb, var(--ink) 30%, transparent);
-    background: color-mix(in srgb, var(--paper) 80%, transparent);
+    line-height: 1;
+    color: var(--paper);
+    background: var(--ink);
+}
+.avatar-small { width: 34px; height: 34px; font-size: 1.05rem; }
+.avatar-large { width: 44px; height: 44px; font-size: 1.35rem; }
+
+.profile-button {
+    display: inline-grid;
+    place-items: center;
+    padding: 2px;
+    border: 1px solid color-mix(in srgb, var(--ink) 25%, transparent);
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--paper) 75%, transparent);
     cursor: pointer;
 }
-.viewing-as-select:hover { border-color: var(--accent); }
-.demo-tag {
-    font-size: 0.75rem;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    padding: 1px 6px;
-    border-radius: 4px;
-    border: 1px dashed color-mix(in srgb, var(--ink) 40%, transparent);
-    opacity: 0.7;
+.profile-button:hover { border-color: var(--accent); }
+
+.profile-scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 1500;
+    background: color-mix(in srgb, var(--ink) 35%, transparent);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.22s ease, visibility 0s linear 0.22s;
 }
-@media (max-width: 520px) {
-    .viewing-as label { display: none; } /* phone: just the picker + demo tag */
+.profile-menu {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1501; /* over the map, list and readout; under the photo viewer and update banner */
+    width: min(320px, 86vw);
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    padding: max(18px, calc(env(safe-area-inset-top) + 8px)) 18px max(18px, env(safe-area-inset-bottom));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    background: var(--paper);
+    color: var(--ink);
+    border-left: 1px solid var(--rule);
+    box-shadow: -12px 0 40px color-mix(in srgb, var(--ink) 22%, transparent);
+    transform: translateX(105%);
+    visibility: hidden;
+    transition: transform 0.24s ease, visibility 0s linear 0.24s;
 }
+.menu-open .profile-scrim { opacity: 1; visibility: visible; transition: opacity 0.22s ease; }
+.menu-open .profile-menu { transform: none; visibility: visible; transition: transform 0.24s ease; }
+@media (prefers-reduced-motion: reduce) {
+    .profile-scrim, .profile-menu { transition: none; }
+}
+
+.profile-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--rule);
+}
+.profile-who { display: flex; flex-direction: column; flex: 1; min-width: 0; font-family: var(--font-sign); }
+.profile-who strong { font-size: var(--step-1); font-weight: 600; line-height: 1.1; }
+.profile-who span { font-size: var(--step--1); color: var(--ink-soft); }
+.profile-close {
+    display: inline-grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    border: 0;
+    border-radius: 6px;
+    background: none;
+    color: var(--ink);
+    cursor: pointer;
+}
+.profile-close:hover { color: var(--accent); }
+
+.profile-links { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.profile-links a {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    padding: 10px 12px;
+    border-radius: 6px;
+    font-family: var(--font-sign);
+    font-size: var(--step-0);
+    font-weight: 600;
+    text-decoration: none;
+    color: var(--ink);
+}
+.profile-links a:hover { background: color-mix(in srgb, var(--ink) 7%, transparent); }
+.profile-links a[aria-current='page'] { background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent); }
+.profile-count { font-weight: 500; color: var(--ink-soft); }
+.profile-hint { margin: 0; font-size: var(--step--1); color: var(--ink-soft); }
+
+.profile-demo {
+    margin-top: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 12px;
+    border: 1px dashed color-mix(in srgb, var(--ink) 35%, transparent);
+    border-radius: 6px;
+    font-family: var(--font-sign);
+    font-size: var(--step--1);
+}
+.profile-demo label { font-weight: 600; }
+.viewing-as-select {
+    font: inherit;
+    font-size: var(--step-0);
+    font-weight: 600;
+    color: var(--ink);
+    padding: 6px 8px;
+    border-radius: 6px;
+    border: 1px solid color-mix(in srgb, var(--ink) 30%, transparent);
+    background: color-mix(in srgb, var(--paper) 80%, white);
+    cursor: pointer;
+}
+.demo-note { margin: 0; color: var(--ink-soft); line-height: 1.35; }

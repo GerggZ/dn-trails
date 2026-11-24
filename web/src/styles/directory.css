@@ -6,7 +6,7 @@
 .explore-page .site-bar {
     max-width: none;
     padding: 12px var(--gutter);
-    padding-top: calc(12px + env(safe-area-inset-top));
+    padding-top: max(12px, calc(env(safe-area-inset-top) + 2px));
 }
 
 .explore {
@@ -432,3 +432,22 @@
 .hike-row:focus-visible .hike-title { text-decoration-color: var(--accent); }
 .hike-row:hover .card-art img { transform: scale(1.035); }
 
+
+/* "My hikes ×" / "Shared with me ×": the list is filtered (profile menu); tap to show all again */
+.scope-clear {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin: -4px 0 12px;
+    padding: 3px 6px 3px 12px;
+    border-radius: 999px;
+    border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+    background: color-mix(in srgb, var(--accent) 10%, transparent);
+    color: var(--accent);
+    font-family: var(--font-sign);
+    font-size: var(--step--1);
+    font-weight: 600;
+    text-decoration: none;
+}
+.scope-x { font-size: 1.1em; line-height: 1; padding: 0 4px; }
+.scope-clear:hover { border-color: var(--accent); }

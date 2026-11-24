@@ -4,7 +4,7 @@ import './styles/hike.css';
 import './styles/gallery.css';
 
 import { getHike, asset, el } from './lib/data.js';
-import { setupViewingAs } from './lib/viewing-as.js';
+import { setupProfileMenu } from './lib/profile-menu.js';
 import { fmtDist, fmtElev, fmtDuration, fmtWalk } from './lib/units.js';
 import { onPaceChange, paceSlider } from './lib/pace.js';
 import { hasTimes, totalHours } from './lib/walking-time.js';
@@ -94,7 +94,7 @@ function renderHeader(hike) {
 }
 
 const id = new URLSearchParams(window.location.search).get('id');
-setupViewingAs(document.querySelector('.site-bar'));
+setupProfileMenu(document.querySelector('.site-bar'));
 
 if (!id) {
     window.location.replace('./index.html');

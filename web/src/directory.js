@@ -10,8 +10,8 @@ import './fonts.js';
 import './styles/base.css';
 import './styles/directory.css';
 
-import { listHikes, asset, el } from './lib/data.js';
-import { setupViewingAs } from './lib/viewing-as.js';
+import { listHikes, SCOPES, asset, el } from './lib/data.js';
+import { setupProfileMenu, currentScope } from './lib/profile-menu.js';
 import { fmtDist, fmtElev, fmtWalk } from './lib/units.js';
 import { cutOut } from './lib/silhouette.js';
 import { renderBackdrop } from './lib/backdrop.js';
@@ -369,13 +369,31 @@ sheet.set('mid', { animate: false });
 setupSheetDrag();
 setupCards();
 
-setupViewingAs(document.getElementById('site-bar'));
+setupProfileMenu(document.getElementById('site-bar'));
 
-listHikes()
+// Which list we're showing (profile menu: All hikes / My hikes / Shared with me)
+const scope = currentScope();
+const EMPTY = {
+    all: 'No hikes yet. Add one with tools/new_hike.py, then run tools/build_hikes.py.',
+    mine: "You don't have any hikes of your own yet.",
+    shared: 'Nobody has shared a hike with you yet.',
+};
+if (scope !== 'all') {
+    document.querySelector('.panel-head h1').textContent = SCOPES[scope].heading;
+    document.title = `${SCOPES[scope].heading} · Hiking Book`;
+    const clear = el('a', { className: 'scope-clear', href: './index.html' },
+        el('span', { textContent: SCOPES[scope].title }),
+        el('span', { className: 'scope-x', ariaHidden: 'true', textContent: '×' }));
+    clear.title = 'Show all hikes';
+    clear.setAttribute('aria-label', `${SCOPES[scope].title}: show all hikes instead`);
+    document.querySelector('.panel-head').after(clear);
+}
+
+listHikes(scope)
     .then((hikes) => {
         renderTotals(hikes);
         if (!hikes.length) {
-            list.append(el('p', { className: 'error', textContent: 'No hikes yet. Add one with tools/new_hike.py, then run tools/build_hikes.py.' }));
+            list.append(el('p', { className: 'error', textContent: EMPTY[scope] }));
             return;
         }
         const rows = new Map(hikes.map((h) => [h.id, hikeRow(h)]));

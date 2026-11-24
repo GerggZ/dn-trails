@@ -340,6 +340,8 @@
 /* Phones: the map on the page is a preview; a tap opens the full-screen view.
    Only the full-screen button shows on it; the page scrolls over it. */
 #map-container.map-peek { cursor: pointer; touch-action: pan-y; }
+/* Phones: the preview on the page is shorter (a tap opens the full map anyway) */
+#map-container.map-peek { height: clamp(240px, 38vh, 360px); }
 #map-container.map-peek .leaflet-control:not(.full-control):not(.leaflet-control-attribution) { display: none; }
 
 .full-control .full-button svg { display: block; }
@@ -367,8 +369,8 @@ html.map-open, html.map-open body { overflow: hidden; }
 }
 /* Credit line just above the floating profile (set from JS) */
 .map-full .leaflet-bottom { bottom: var(--dock-cover, 0px); }
-/* Clear of the notch / status bar when installed to the home screen */
-.map-full .leaflet-top { top: env(safe-area-inset-top); }
+/* Clear of the camera / clock, but closer than Leaflet's 10 px margin below it */
+.map-full .leaflet-top { top: max(0px, calc(env(safe-area-inset-top) - 6px)); }
 
 /* The profile floats over the map as a card: not quite full width, rounded corners */
 .map-full-profile {

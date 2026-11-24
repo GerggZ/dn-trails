@@ -1153,8 +1153,11 @@ export function renderMapAndElevation(hike) {
         btn.innerHTML = full ? ICON_CLOSE : ICON_OPEN;
         btn.title = full ? 'Close map' : 'Full-screen map';
         btn.setAttribute('aria-label', btn.title);
+        const wasPeek = mapBox.classList.contains('map-peek');
         mapBox.classList.toggle('map-peek', peek());
         if (!full) setInteractive(!compact.matches);
+        // The phone preview is shorter: re-fit when it changes size outside open/close
+        if (!full && wasPeek !== peek()) { map.invalidateSize(); map.fitBounds(hike.bbox, fitOpts()); }
     }
     function relayout() {
         syncHover(null);

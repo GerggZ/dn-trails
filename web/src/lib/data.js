@@ -1,7 +1,7 @@
 // The ONE place the pages get hike data from, and the one place that decides
 // who may see what. Pages never read the JSON files themselves.
 //
-// DEMO: there are no real logins. "Viewing as" (src/lib/viewing-as.js) picks
+// DEMO: there are no real logins. "Viewing as" in the profile menu (src/lib/profile-menu.js) picks
 // a user from data/users.json, and the rules below filter the hikes in the
 // browser. Everything is still public: anyone can open data/index.json.
 // Later, the inside of this file talks to a real backend that applies the
@@ -61,10 +61,32 @@ async function viewer() {
     return { user, groups };
 }
 
-/** The cards of every hike the current user may see (newest first). */
-export async function listHikes() {
+/** Is `hike` shared with `user` (directly or through one of their groups), not just public? */
+export function sharedWith(user, hike, groups = []) {
+    if (!user || hike.owner === user.id) return false;
+    const shared = hike.shared_with ?? [];
+    return shared.includes(user.id) || groups.some((g) => shared.includes(g.id) && g.members.includes(user.id));
+}
+
+/** Which hikes a list shows (index.html?show=...). Guests only have "all". */
+export const SCOPES = {
+    all: { title: 'All hikes', heading: 'Our hikes', test: () => true },
+    mine: { title: 'My hikes', heading: 'My hikes', test: (user, h) => !!user && h.owner === user.id },
+    shared: { title: 'Shared with me', heading: 'Shared with me', test: (user, h, groups) => sharedWith(user, h, groups) },
+};
+
+/** The cards of the hikes the current user may see (newest first), optionally only one scope. */
+export async function listHikes(scope = 'all') {
     const [index, { user, groups }] = await Promise.all([loadIndex(), viewer()]);
-    return index.filter((h) => canSee(user, h, groups));
+    const test = (SCOPES[scope] ?? SCOPES.all).test;
+    return index.filter((h) => canSee(user, h, groups) && test(user, h, groups));
+}
+
+/** How many hikes each scope has for the current user: { all: 4, mine: 3, shared: 1 } */
+export async function scopeCounts() {
+    const [index, { user, groups }] = await Promise.all([loadIndex(), viewer()]);
+    const visible = index.filter((h) => canSee(user, h, groups));
+    return Object.fromEntries(Object.entries(SCOPES).map(([k, s]) => [k, visible.filter((h) => s.test(user, h, groups)).length]));
 }
 
 export class NotFound extends Error {}
