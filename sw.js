@@ -12,7 +12,11 @@
 // new pages, and the saved hike data refreshed. The value here is only used
 // if sw.js is served without building.
 
-const VERSION = "24 Nov 2026, 15:01 · 820b2b1";
+const VERSION = "25 Nov 2026, 11:51 · 0e1d595";
+// This build's JS, CSS and fonts (assets/…), filled in on every `npm run build`
+// (see vite.config.js). Saved at install, so the book opens offline even if a
+// page was never opened online since the last update.
+const BUILD_FILES = ["assets/barlow-condensed-latin-500-normal-BgYH2mbd.woff2","assets/barlow-condensed-latin-600-normal-DepVgxBB.woff2","assets/barlow-condensed-latin-700-normal-v1xN8_Wq.woff2","assets/barlow-condensed-latin-ext-500-normal-yA5ONLQ9.woff2","assets/barlow-condensed-latin-ext-600-normal-18ESti3H.woff2","assets/barlow-condensed-latin-ext-700-normal-CwuXbfVR.woff2","assets/full-screen-Bpx9nUNH.css","assets/full-screen-O1jh5bgm.js","assets/hike-BIYv832H.css","assets/hike-CFBzHcDh.js","assets/index-F7PZuu2p.js","assets/index-LnJk27PQ.css","assets/source-serif-4-latin-400-italic-0j97Jm6B.woff2","assets/source-serif-4-latin-400-normal-DJ5YJwmz.woff2","assets/source-serif-4-latin-600-normal-DouSKlru.woff2","assets/source-serif-4-latin-ext-400-italic-Cj8BerOQ.woff2","assets/source-serif-4-latin-ext-400-normal-B5LksYz5.woff2","assets/source-serif-4-latin-ext-600-normal-pa-C5Dkf.woff2"];
 const PAGES = `hb-pages-${VERSION}`;
 const ASSETS = 'hb-assets';
 const DATA = 'hb-data';
@@ -21,8 +25,13 @@ const TILES = 'hb-tiles';
 const MAX_TILES = 12000; // ≈ 300–400 MB; room for a few hikes saved at "Max detail"
 
 const SCOPE = self.registration.scope; // e.g. https://you.github.io/hiking-book/
-const CORE = ['', 'index.html', 'hike.html', 'manifest.webmanifest', 'data/index.json', 'data/users.json', 'data/backgrounds.json']
-    .map((p) => new URL(p, SCOPE).href);
+const at = (p) => new URL(p, SCOPE).href;
+// Must be saved at install (or the install fails and the previous version keeps working)
+const PAGE_FILES = ['', 'index.html', 'hike.html'].map(at);
+// Nice to have
+const CORE = ['manifest.webmanifest', 'data/index.json', 'data/users.json', 'data/backgrounds.json'].map(at);
+// Online but no answer within this time (weak signal in the mountains): use the saved page
+const PAGE_TIMEOUT_MS = 3000;
 
 // Map pictures for every map in config.js mapLayers (OpenTopoMap, OpenStreetMap, Esri)
 const TILE_HOSTS = /(^|\.)tile\.opentopomap\.org$|(^|\.)tile\.openstreetmap\.org$|(^|\.)arcgisonline\.com$/;
@@ -35,8 +44,12 @@ function tileKey(url) {
 self.addEventListener('install', (event) => {
     event.waitUntil((async () => {
         const cache = await caches.open(PAGES);
-        // One failing file shouldn't stop the install
+        // One failing extra file shouldn't stop the install
         await Promise.all(CORE.map((url) => cache.add(url).catch(() => {})));
+        // The pages and the code they need must match: fetch the pages fresh (not from the
+        // browser's HTTP cache, which may still hold the previous build's pages)
+        await cache.addAll(PAGE_FILES.map((url) => new Request(url, { cache: 'reload' })));
+        await (await caches.open(ASSETS)).addAll(BUILD_FILES.map(at));
         await refreshData();
         await self.skipWaiting();
     })());
@@ -60,6 +73,12 @@ self.addEventListener('activate', (event) => {
     event.waitUntil((async () => {
         for (const name of await caches.keys()) {
             if (name.startsWith('hb-pages-') && name !== PAGES) await caches.delete(name);
+        }
+        // Drop JS/CSS of older builds (not when sw.js runs unbuilt: the list is empty then)
+        if (BUILD_FILES.length) {
+            const keep = new Set(BUILD_FILES.map(at));
+            const assets = await caches.open(ASSETS);
+            for (const request of await assets.keys()) if (!keep.has(request.url)) await assets.delete(request);
         }
         await self.clients.claim();
     })());
@@ -93,15 +112,18 @@ self.addEventListener('fetch', (event) => {
 
 async function page(request) {
     const cache = await caches.open(PAGES);
-    try {
-        const response = await fetch(request);
+    const network = fetch(request).then((response) => {
         if (response.ok) cache.put(request.url.split('?')[0], response.clone());
         return response;
+    });
+    network.catch(() => {}); // a late failure after we already answered from the cache
+    try {
+        return await Promise.race([network, new Promise((_, reject) => setTimeout(reject, PAGE_TIMEOUT_MS))]);
     } catch {
-        // hike.html?id=x -> the saved hike.html (the id is read by the page itself)
-        return (await cache.match(request, { ignoreSearch: true }))
-            ?? (await cache.match(new URL('index.html', SCOPE).href))
-            ?? Response.error();
+        // Offline, or no answer in time. hike.html?id=x -> the saved hike.html (the page reads the id itself)
+        const saved = (await cache.match(request, { ignoreSearch: true }))
+            ?? (await cache.match(at('index.html')));
+        return saved ?? network.catch(() => Response.error()); // nothing saved: keep waiting for the network
     }
 }
 
