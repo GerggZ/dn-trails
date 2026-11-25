@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite';
 import { resolve } from 'node:path';
 import { execSync } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, readdirSync } from 'node:fs';
 
 // Every build gets a version stamp: when it was built + the git commit
 // (like Hitster). It's shown at the bottom of every page and written to
@@ -46,7 +46,14 @@ export default defineConfig(({ command }) => {
           const text = readFileSync(sw, 'utf8');
           const stamped = text.replace(/^const VERSION = .*$/m, `const VERSION = ${JSON.stringify(version)};`);
           if (stamped === text) throw new Error('version-stamp: no "const VERSION = …" line found in sw.js');
-          writeFileSync(sw, stamped);
+          // ...and the list of files the pages need, so the service worker saves them at install
+          // (fonts: only the latin sets, the others are never downloaded for our text)
+          const files = readdirSync(resolve(outDir, 'assets'))
+            .filter((f) => /\.(js|css|png|svg)$/.test(f) || (/\.woff2$/.test(f) && /-latin-/.test(f)))
+            .map((f) => `assets/${f}`);
+          const listed = stamped.replace(/^const BUILD_FILES = .*$/m, `const BUILD_FILES = ${JSON.stringify(files)};`);
+          if (listed === stamped) throw new Error('version-stamp: no "const BUILD_FILES = …" line found in sw.js');
+          writeFileSync(sw, listed);
           // Compare this with "Version:" at the bottom of the book on your phone
           console.log(`\n  Hiking Book version: ${version}\n`);
         },
