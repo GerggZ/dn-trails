@@ -48,6 +48,15 @@ npm install
 5. `cd web` → `npm run dev` → open http://127.0.0.1:5180
    - On your phone (same Wi-Fi): `npm run dev:phone` instead, then open the "Network:" address it prints (e.g. http://192.168.1.23:5180). Your location doesn't work there (phones only share it over https).
 
+## Two books: public and wedding
+
+The `.env` file at the top (copy `.env.example` if it's missing) says which book
+everything works on: `BOOK=public` (`hikes/`, GitHub Pages) or `BOOK=wedding`
+(`wedding_hikes/`, Danna & Neil's book on Cloudflare, never committed).
+After changing it: run step 4 again, then restart `npm run dev`.
+Deploy: `npm run deploy` (public) or `npm run deploy:wedding`; each refuses to run
+if the data is the other book.
+
 Rerun step 4 whenever you change a hike. Hikes and photos that didn't change
 are skipped, so it stays fast (`FORCE_REBUILD = True` in `build_hikes.py` redoes everything).
 
@@ -151,7 +160,12 @@ npm run build
 npm run preview      # → http://127.0.0.1:4180
 ```
 
-On a phone it needs the published (https) version.
+On a phone: `npm run preview:phone` and open the "Network:" address (same Wi-Fi).
+That shows the built version, but over plain http the phone won't start the
+service worker, so install, offline and your location only work in the
+published (https) version, or on Android with Chrome's USB port forwarding
+(chrome://inspect → Port forwarding 4180 → localhost:4180, then open
+http://localhost:4180 on the phone).
 
 The ports (5180 dev, 4180 preview) are deliberately different from Hitster's:
 a service worker belongs to an address, so two apps on the same port would

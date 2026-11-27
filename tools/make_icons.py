@@ -1,38 +1,48 @@
-"""Make the browser-tab and home-screen icons from the D&N logo.
+"""Make the browser-tab and home-screen icons, and the site-bar logo, for both books.
 
-    python tools/make_icons.py [--color "#202845"] [--background "#FFB892,#FA9F95,#CF9096"] [--tab-color "#8A8A8A"]
+Set the colors below and run this file, then rebuild the site.
 
---background takes one color, or several separated by commas for a top-to-bottom
-gradient. The default is the light part of the pink sunset (backgrounds/DSC_3651_1.JPG):
-peach, coral, dusky pink, with a navy logo (the navy of that sunset's clouds).
-Full sunset, white logo:  --color "#FFFFFF" --background "#F89D93,#B98A9C,#5E5A80,#2B3455"
-Plain light version:      --color "#17261F" --background "#EEF0EA"
+For each logo in LOGOS it reads branding/<name>.png (left grey, never changed)
+and branding/<name>.svg, and writes to web/public/icons/:
+  <prefix>-favicon-64.png        browser tab: logo only, transparent (TAB_COLOR)
+  <prefix>-icon-192.png / -512   home screen: logo (COLOR) on BACKGROUND
+  <prefix>-icon-maskable-512.png Android adaptive icon: same, with extra margin
+  <prefix>-apple-touch-180.png   iPhone / iPad home screen
+  <prefix>-logo.svg              the logo in the site bar (SITE_BAR_COLOR)
 
-Reads branding/DannaNeil-logo-gray.png (left grey, never changed) and writes
-recolored copies to web/public/icons/:
-  dn-favicon-64.png        browser tab: logo only, transparent (--tab-color)
-  dn-icon-192.png / -512   home screen: logo (--color) on --background
-  dn-icon-maskable-512.png Android adaptive icon: same, with extra margin
-  dn-apple-touch-180.png   iPhone / iPad home screen
+Which book uses which prefix: config.js editions (logo: 'hb' / 'dn').
 
-Run it again with other colors whenever you like, then rebuild the site.
+Earlier color ideas:
+  pink sunset:  COLOR "#202845", BACKGROUND "#FFB892,#FA9F95,#CF9096"
+  full sunset:  COLOR "#FFFFFF", BACKGROUND "#F89D93,#B98A9C,#5E5A80,#2B3455"
+  plain light:  COLOR "#17261F", BACKGROUND "#EEF0EA"
 """
 
 from __future__ import annotations
 
-import argparse
+import re
 from pathlib import Path
 
 from PIL import Image, ImageColor, ImageDraw
 
+# --- Settings ---
+LOGOS = {
+    "hb": "generic-logo-gray",     # public hiking book
+    "dn": "DannaNeil-logo-gray",   # Danna & Neil's wedding book
+}
+COLOR = "#2B3320"                          # logo on the home-screen icons (dark olive)
+BACKGROUND = "#EEF0E2,#E3E6D2,#D3D8BE"     # one color, or a comma-separated gradient (top to bottom)
+TAB_COLOR = "#8A8A8A"                      # browser tab (grey shows on light and dark tabs)
+SITE_BAR_COLOR = "#292F14"                 # site-bar logo: the page's ink color
+
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE = ROOT / "branding" / "DannaNeil-logo-gray.png"
+BRANDING = ROOT / "branding"
 OUT = ROOT / "web" / "public" / "icons"
 
 
-def logo_shape() -> Image.Image:
+def logo_shape(source: Path) -> Image.Image:
     """The logo's outline (alpha channel), trimmed to its edges."""
-    alpha = Image.open(SOURCE).convert("RGBA").getchannel("A")
+    alpha = Image.open(source).convert("RGBA").getchannel("A")
     return alpha.crop(alpha.point(lambda v: 255 if v > 8 else 0).getbbox())
 
 
@@ -63,28 +73,34 @@ def icon(shape: Image.Image, size: int, color: str, background: str | None, fill
     return canvas
 
 
-def main() -> None:
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--color", default="#2B3320", help="logo color on the home-screen icons")
-    ap.add_argument("--background", default="#EEF0E2,#E3E6D2,#D3D8BE",
-                    help="background of the home-screen icons: one color, or a comma-separated gradient (top to bottom)")
-    ap.add_argument("--tab-color", default="#8A8A8A", help="logo color in the browser tab (grey shows on light and dark tabs)")
-    args = ap.parse_args()
+def site_bar_svg(source: Path, color: str) -> str:
+    """The SVG logo recolored (its one fill on the <svg> element), title kept for screen readers."""
+    text = source.read_text(encoding="utf-8")
+    recolored, n = re.subn(r'(<svg\b[^>]*\bfill=")[^"]*(")', rf"\g<1>{color}\g<2>", text, count=1)
+    if n != 1:
+        raise ValueError(f"{source.name}: no fill=\"...\" on the <svg> element to recolor")
+    return recolored
 
-    shape = logo_shape()
+
+def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
-    files = {
-        "dn-favicon-64.png": icon(shape, 64, args.tab_color, None, 0.98),
-        "dn-icon-192.png": icon(shape, 192, args.color, args.background, 0.80),
-        "dn-icon-512.png": icon(shape, 512, args.color, args.background, 0.80),
-        "dn-icon-maskable-512.png": icon(shape, 512, args.color, args.background, 0.62),
-        "dn-apple-touch-180.png": icon(shape, 180, args.color, args.background, 0.78),
-    }
-    for name, img in files.items():
-        if name != "dn-favicon-64.png":
-            img = img.convert("RGB")  # home-screen icons must be opaque
-        img.save(OUT / name, optimize=True)
-        print("wrote", (OUT / name).relative_to(ROOT))
+    for prefix, name in LOGOS.items():
+        shape = logo_shape(BRANDING / f"{name}.png")
+        files = {
+            f"{prefix}-favicon-64.png": icon(shape, 64, TAB_COLOR, None, 0.98),
+            f"{prefix}-icon-192.png": icon(shape, 192, COLOR, BACKGROUND, 0.80),
+            f"{prefix}-icon-512.png": icon(shape, 512, COLOR, BACKGROUND, 0.80),
+            f"{prefix}-icon-maskable-512.png": icon(shape, 512, COLOR, BACKGROUND, 0.62),
+            f"{prefix}-apple-touch-180.png": icon(shape, 180, COLOR, BACKGROUND, 0.78),
+        }
+        for file, img in files.items():
+            if "favicon" not in file:
+                img = img.convert("RGB")  # home-screen icons must be opaque
+            img.save(OUT / file, optimize=True)
+            print("wrote", (OUT / file).relative_to(ROOT))
+        svg = OUT / f"{prefix}-logo.svg"
+        svg.write_text(site_bar_svg(BRANDING / f"{name}.svg", SITE_BAR_COLOR), encoding="utf-8", newline="\n")
+        print("wrote", svg.relative_to(ROOT))
 
 
 if __name__ == "__main__":

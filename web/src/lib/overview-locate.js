@@ -17,12 +17,14 @@ const locateIcon = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden=
 
 /**
  * @param overview  what overviewMap() returned
- * @param hikes     entries of index.json
+ * @param hikes     entries of index.json, or a function returning the ones shown right now
  * @param say       (text or null) => show a line under the search box
  */
 export function setupOverviewLocate(overview, hikes, say) {
-    if (!('geolocation' in navigator)) return;
+    if (!('geolocation' in navigator)) return { refresh() {} };
     const { map } = overview;
+    const current = () => (typeof hikes === 'function' ? hikes() : hikes);
+    let lastPos = null;
 
     let watchId = null;
     let dot = null;
@@ -32,6 +34,7 @@ export function setupOverviewLocate(overview, hikes, say) {
     let nearIds = '';
 
     function onPosition(pos) {
+        lastPos = pos;
         const { latitude: lat, longitude: lon, accuracy } = pos.coords;
         const here = [lat, lon];
         if (!dot) {
@@ -43,7 +46,13 @@ export function setupOverviewLocate(overview, hikes, say) {
         }
 
         const reach = NEAR_KM + Math.min(accuracy, 500) / 1000;
-        const dists = hikes.map((h) => ({ h, d: distanceToHike(h, here) })).sort((a, b) => a.d - b.d);
+        const dists = current().map((h) => ({ h, d: distanceToHike(h, here) })).sort((a, b) => a.d - b.d);
+        if (!dists.length) { // no hikes in this list
+            nearIds = '';
+            overview.focusHikes(null);
+            say(null);
+            return;
+        }
         const near = dists.filter(({ d }) => d <= reach).map(({ h }) => h);
         const ids = near.map((h) => h.id).join(',');
 
@@ -131,4 +140,13 @@ export function setupOverviewLocate(overview, hikes, say) {
             .then((p) => { if (p.state === 'granted') start(); })
             .catch(() => {});
     }
+
+    return {
+        /** The list changed (profile menu): work out again which hike you're at. */
+        refresh() {
+            if (!lastPos || watchId == null) return;
+            nearIds = null;
+            onPosition(lastPos);
+        },
+    };
 }

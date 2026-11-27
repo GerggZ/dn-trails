@@ -1,8 +1,11 @@
 // The maps a reader can choose from (config.js mapLayers) and the layer button
-// on the hike map. The choice is remembered on the device; "Save for offline"
-// stores the map that is selected.
+// on the hike map. The choice is remembered on the device. "Save for offline"
+// always stores the map marked offline: true in config.js (see offline-store.js).
 
 import L from 'leaflet';
+// Leaflet's own CSS first, so our map styles below always come after it and win
+// (in the build, CSS order follows the order files are first imported).
+import 'leaflet/dist/leaflet.css';
 import '../styles/map-styles.css';
 import '../styles/map-controls.css';
 import { APP_CONFIG } from '../config.js';

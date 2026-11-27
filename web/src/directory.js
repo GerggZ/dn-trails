@@ -11,7 +11,7 @@ import './styles/base.css';
 import './styles/directory.css';
 
 import { listHikes, SCOPES, asset, el } from './lib/data.js';
-import { setupProfileMenu, currentScope } from './lib/profile-menu.js';
+import { setupProfileMenu, currentScope, switchScope, SCOPE_EVENT } from './lib/profile-menu.js';
 import { fmtDist, fmtElev, fmtWalk } from './lib/units.js';
 import { cutOut } from './lib/silhouette.js';
 import { renderBackdrop } from './lib/backdrop.js';
@@ -21,6 +21,7 @@ import { overviewMap } from './lib/overview-map.js';
 import { findPlace, distanceToHike } from './lib/place-search.js';
 import { setupOverviewLocate } from './lib/overview-locate.js';
 import { APP_CONFIG } from './config.js';
+import { BOOK_NAME } from './lib/edition.js';
 import { registerServiceWorker, setupInstallButton } from './lib/pwa.js';
 import { watchForUpdates } from './lib/version.js';
 import { keepFullScreen } from './lib/full-screen.js';
@@ -180,7 +181,8 @@ function setBaseOrder(ids) {
 }
 
 // ---------- search a place: hikes get sorted by how far away they are (none are hidden) ----------
-function setupFinder(hikes, rows, overview) {
+function setupFinder(rows, overview) {
+    const hikes = allHikes; // all of them get sorted (rows not in the current list are hidden)
     const form = document.getElementById('place-search');
     const input = document.getElementById('place-input');
     const status = document.getElementById('place-status');
@@ -226,7 +228,7 @@ function setupFinder(hikes, rows, overview) {
             }
             mapView = null;
             setBaseOrder(sorted.map(({ h }) => h.id));
-            overview.showPlace(place, sorted[0].h);
+            overview.showPlace(place, sorted.find(({ h }) => visible.has(h.id))?.h);
             say('Closest to ', el('strong', { textContent: place.label }), ' first. ', clearButton());
         } catch {
             say('Searching needs internet – couldn’t reach OpenStreetMap. ', clearButton());
@@ -273,7 +275,7 @@ function buildCards(id) {
     const from = hikesById.get(id);
     const centre = centreOf(from);
     const near = [...hikesById.values()]
-        .filter((h) => h.id !== id)
+        .filter((h) => h.id !== id && visible.has(h.id))
         .map((h) => ({ h, d: distanceToHike(h, centre) }))
         .sort((a, b) => a.d - b.d)
         .slice(0, NEAR_CARDS)
@@ -371,29 +373,57 @@ setupCards();
 
 setupProfileMenu(document.getElementById('site-bar'));
 
-// Which list we're showing (profile menu: All hikes / My hikes / Shared with me)
-const scope = currentScope();
+// ---------- which list we're showing (profile menu: All hikes / My hikes / Shared with me) ----------
+// The page is built once with every hike you may see; switching lists only
+// hides rows and trails (no reload: the map and the open menu stay put).
 const EMPTY = {
     all: 'No hikes yet. Add one with tools/new_hike.py, then run tools/build_hikes.py.',
     mine: "You don't have any hikes of your own yet.",
     shared: 'Nobody has shared a hike with you yet.',
 };
-if (scope !== 'all') {
-    document.querySelector('.panel-head h1').textContent = SCOPES[scope].heading;
-    document.title = `${SCOPES[scope].heading} · Hiking Book`;
-    const clear = el('a', { className: 'scope-clear', href: './index.html' },
-        el('span', { textContent: SCOPES[scope].title }),
-        el('span', { className: 'scope-x', ariaHidden: 'true', textContent: '×' }));
-    clear.title = 'Show all hikes';
-    clear.setAttribute('aria-label', `${SCOPES[scope].title}: show all hikes instead`);
-    document.querySelector('.panel-head').after(clear);
+const baseTitle = document.title;
+let allHikes = [];
+let visible = new Set(); // ids of the hikes in the current list
+const shownHikes = () => allHikes.filter((h) => visible.has(h.id));
+const emptyNote = el('p', { className: 'error', hidden: true });
+list.before(emptyNote);
+let scopeChip = null;
+let locate = null;
+
+async function setScope(scope, { first = false } = {}) {
+    visible = new Set((await listHikes(scope)).map((h) => h.id));
+
+    const { heading, title } = SCOPES[scope];
+    document.querySelector('.panel-head h1').textContent = heading;
+    document.title = scope === 'all' ? baseTitle : `${heading} · ${BOOK_NAME}`;
+    scopeChip?.remove();
+    scopeChip = null;
+    if (scope !== 'all') {
+        scopeChip = el('a', { className: 'scope-clear', href: './index.html' },
+            el('span', { textContent: title }),
+            el('span', { className: 'scope-x', ariaHidden: 'true', textContent: '×' }));
+        scopeChip.title = 'Show all hikes';
+        scopeChip.setAttribute('aria-label', `${title}: show all hikes instead`);
+        scopeChip.addEventListener('click', (e) => { e.preventDefault(); switchScope('all'); });
+        document.querySelector('.panel-head').after(scopeChip);
+    }
+
+    for (const [id, row] of rowsById) row.hidden = !visible.has(id);
+    emptyNote.textContent = EMPTY[scope];
+    emptyNote.hidden = visible.size > 0;
+    renderTotals(shownHikes());
+    if (!first) list.scrollTop = 0;
+    overview?.setVisible(visible, { animate: !first });
+    locate?.refresh();
 }
 
-listHikes(scope)
-    .then((hikes) => {
-        renderTotals(hikes);
+listHikes('all')
+    .then(async (hikes) => {
+        allHikes = hikes;
         if (!hikes.length) {
-            list.append(el('p', { className: 'error', textContent: EMPTY[scope] }));
+            renderTotals(hikes);
+            emptyNote.textContent = EMPTY.all;
+            emptyNote.hidden = false;
             return;
         }
         const rows = new Map(hikes.map((h) => [h.id, hikeRow(h)]));
@@ -419,12 +449,15 @@ listHikes(scope)
             row.addEventListener('pointerenter', () => overview.highlight(id, true));
             row.addEventListener('pointerleave', () => overview.highlight(id, false));
         }
-        setupFinder(hikes, rows, overview);
+        setupFinder(rows, overview);
 
         const youStatus = document.getElementById('you-status');
-        setupOverviewLocate(overview, hikes, (text) => {
+        locate = setupOverviewLocate(overview, shownHikes, (text) => {
             youStatus.textContent = text ?? '';
             youStatus.hidden = !text;
         });
+
+        await setScope(currentScope(), { first: true });
+        window.addEventListener(SCOPE_EVENT, (e) => setScope(e.detail));
     })
     .catch((err) => list.append(el('p', { className: 'error', textContent: err.message })));

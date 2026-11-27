@@ -107,6 +107,13 @@ img { display: block; max-width: 100%; }
     gap: 10px;
     text-decoration: none;
 }
+/* The book's logo (icons/hb-logo.svg or dn-logo.svg, from tools/make_icons.py) */
+.home-logo {
+    height: 1.9em;
+    width: auto;
+    margin: -0.35em 0; /* taller than the text, without making the bar taller */
+    flex: none;
+}
 
 .error {
     grid-column: 1 / -1;
@@ -448,6 +455,84 @@ img { display: block; max-width: 100%; }
 .profile-links a[aria-current='page'] { background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent); }
 .profile-count { font-weight: 500; color: var(--ink-soft); }
 .profile-hint { margin: 0; font-size: var(--step--1); color: var(--ink-soft); }
+
+/* Downloads: a row in the list that opens a sub-page of the menu */
+.profile-links .profile-sub-link {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    padding: 10px 12px;
+    border: 0;
+    border-radius: 6px;
+    background: none;
+    font-family: var(--font-sign);
+    font-size: var(--step-0);
+    font-weight: 600;
+    text-align: left;
+    color: var(--ink);
+    cursor: pointer;
+}
+.profile-links .profile-sub-link:hover { background: color-mix(in srgb, var(--ink) 7%, transparent); }
+.profile-row-end { display: inline-flex; align-items: baseline; gap: 8px; }
+.profile-chevron { font-size: 1.25em; line-height: 1; color: var(--ink-soft); }
+
+/* Only the sub-page while it's open, and the sub-page only then */
+.profile-menu[data-view='downloads'] > :not(.profile-downloads) { display: none; }
+.profile-menu:not([data-view='downloads']) > .profile-downloads { display: none; }
+
+.profile-downloads {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+}
+.profile-sub-head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    align-self: stretch;
+    padding-bottom: 14px;
+    margin-bottom: 4px;
+    border-bottom: 1px solid var(--rule);
+}
+.profile-sub-head h2 { margin: 0; font-family: var(--font-sign); font-size: var(--step-1); font-weight: 600; }
+.profile-downloads .profile-hint { padding: 0 12px; }
+.profile-downloads .profile-hint:empty { display: none; }
+.profile-downloads .pill { margin-left: 12px; }
+.profile-download-list { list-style: none; margin: 0; padding: 0; align-self: stretch; display: flex; flex-direction: column; gap: 2px; }
+.profile-download-list li { display: flex; align-items: center; gap: 4px; }
+.profile-download-list a {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-family: var(--font-sign);
+    font-size: var(--step-0);
+    font-weight: 600;
+    line-height: 1.2;
+    text-decoration: none;
+    color: var(--ink);
+}
+.profile-download-list a:hover { background: color-mix(in srgb, var(--ink) 7%, transparent); }
+.profile-download-list small { font-size: var(--step--1); font-weight: 500; color: var(--ink-soft); }
+.profile-remove {
+    display: inline-grid;
+    place-items: center;
+    flex: none;
+    width: 36px;
+    height: 36px;
+    border: 0;
+    border-radius: 6px;
+    background: none;
+    color: var(--ink-soft);
+    cursor: pointer;
+}
+.profile-remove:hover { color: var(--accent); background: color-mix(in srgb, var(--ink) 7%, transparent); }
+.profile-remove:disabled { opacity: 0.5; cursor: progress; }
 
 .profile-demo {
     margin-top: auto;

@@ -1,6 +1,7 @@
 # --- Web (web/) ---
 node_modules
 dist
+dist-wedding
 *.local
 *.log
 
@@ -20,6 +21,14 @@ __pycache__/
 # or delete these two lines to commit them anyway.
 hikes/*/photos/*
 !hikes/*/photos/.gitkeep
+
+# --- Which book (BOOK=public / wedding): local choice, see .env.example ---
+.env
+
+# --- Wedding book ---
+# Danna & Neil's hikes (stories + photos) never go into this public repo.
+# Back this folder up somewhere else (OneDrive or a private repo).
+wedding_hikes/
 
 # --- Editor / OS ---
 .vscode/*

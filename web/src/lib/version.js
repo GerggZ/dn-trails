@@ -2,7 +2,7 @@
 // published (version.json is written by vite.config.js on every build).
 // Same idea as Hitster's src/version.js.
 
-/* global __APP_VERSION__ */
+/* global __APP_VERSION__, __BOOK__ */
 export const APP_VERSION = __APP_VERSION__;
 
 /** Small "Version: 14 Nov 2026, 11:52 · 8c52141" line at the bottom of the sheet. */
@@ -70,7 +70,7 @@ async function checkForUpdate() {
 export function watchForUpdates() {
     showVersion();
     if (APP_VERSION === 'dev') return;
-    console.info(`Hiking Book version: ${APP_VERSION}`);
+    console.info(`${__BOOK__} book, version: ${APP_VERSION}`);
     setTimeout(checkForUpdate, 3000);
     document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible') checkForUpdate();

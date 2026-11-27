@@ -1,4 +1,5 @@
-"""Build the website data from the hikes/ folder.
+"""Build the website data from the hikes/ folder
+(or wedding_hikes/ when BOOK=wedding in the .env file).
 
     python tools/build_hikes.py
 
@@ -16,7 +17,8 @@ For each hike this writes:
 and for all of them together:
     web/public/data/index.json        one card per hike (+ who may see it and
                                       two light copies of the trail for the map)
-    web/public/data/users.json        copy of users.json (demo users)
+    web/public/data/users.json        copy of users.json (demo users; empty in the wedding book)
+    web/public/data/edition.json      which book this is ({"book": "public"} or "wedding")
 
 Hikes whose files didn't change since the last build are skipped (set
 FORCE_REBUILD = True to redo everything, e.g. after changing the tools).
@@ -51,9 +53,9 @@ import fetch_osm  # noqa: E402
 from hikebook.photos import list_photos, process_background, process_photo  # noqa: E402
 from hikebook.palette import palette_from_image  # noqa: E402
 from hikebook.lines import simplified_line  # noqa: E402
+from hikebook.book import BOOK, HIKES_DIR  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
-HIKES_DIR = ROOT / "hikes"
 BACKGROUNDS_DIR = ROOT / "backgrounds"
 PUBLIC_DIR = ROOT / "web" / "public"
 DATA_DIR = PUBLIC_DIR / "data"
@@ -307,6 +309,9 @@ def write_json(path: Path, data) -> None:
 
 def copy_users() -> None:
     """users.json (demo users + groups) -> web/public/data/users.json, after a quick check."""
+    if BOOK == "wedding":  # no accounts in the wedding book: don't ship the demo users
+        write_json(DATA_DIR / "users.json", {"users": [], "groups": []})
+        return
     if not USERS_FILE.exists():
         print("! no users.json – the book will have no demo users")
         write_json(DATA_DIR / "users.json", {"users": [], "groups": []})
@@ -355,7 +360,7 @@ def build_backgrounds() -> None:
 
 def main() -> None:
     if not HIKES_DIR.is_dir():
-        sys.exit(f"No hikes folder at {HIKES_DIR}")
+        sys.exit(f"No hikes folder at {HIKES_DIR} (BOOK={BOOK} in .env)")
 
     folders = sorted(p for p in HIKES_DIR.iterdir() if p.is_dir() and not p.name.startswith(("_", ".")))
     hikes = [h for f in folders if (h := build_hike(f))]
@@ -383,7 +388,9 @@ def main() -> None:
         old_index.unlink()
     copy_users()
     build_backgrounds()
-    print(f"\nBuilt {len(hikes)} hike(s) -> {DATA_DIR.relative_to(ROOT)}")
+    # Which book this data is: vite.config.js and the app (src/lib/edition.js) read it
+    write_json(DATA_DIR / "edition.json", {"book": BOOK})
+    print(f"\nBuilt {len(hikes)} hike(s) of the {BOOK} book -> {DATA_DIR.relative_to(ROOT)}")
 
 
 if __name__ == "__main__":

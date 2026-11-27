@@ -7,10 +7,12 @@
     "data": "python ../tools/build_hikes.py",
     "dev": "vite --host 127.0.0.1 --port 5180 --strictPort",
     "dev:phone": "vite --host --port 5180 --strictPort",
-    "build": "vite build",
+    "build": "npm run data && vite build",
     "preview": "vite preview --host 127.0.0.1 --port 4180 --strictPort",
-    "predeploy": "npm run data && npm run build",
-    "deploy": "gh-pages -d dist"
+    "preview:phone": "vite preview --host --port 4180 --strictPort",
+    "predeploy": "npm run build && node scripts/check-book.js public",
+    "deploy": "gh-pages -d dist",
+    "deploy:wedding": "npm run build && node scripts/check-book.js wedding && wrangler pages deploy dist-wedding --project-name dn-wedding --branch main"
   },
   "dependencies": {
     "@fontsource/barlow-condensed": "^5.0.0",

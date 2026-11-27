@@ -9,9 +9,12 @@ export const APP_CONFIG = {
     // The first one is the default (and is used for the 'map' backdrop).
     // look: optional tint from src/styles/map-styles.css (.map-style-<look>).
     // A new map address also needs its host in TILE_HOSTS in public/sw.js (offline use).
+    // offline: true = the map "Save for offline" stores (the first one marked; whatever map is on
+    // screen). Only Park: OpenStreetMap's tile servers forbid saving for offline, and Esri only
+    // allows it through their own apps.
     mapLayers: [
         {
-            id: 'park', name: 'Park map', look: 'park',
+            id: 'park', name: 'Park map', look: 'park', offline: true,
             url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', maxZoom: 17,
             attribution: '© OpenStreetMap · SRTM · OpenTopoMap (CC-BY-SA)',
         },
@@ -115,5 +118,33 @@ export const APP_CONFIG = {
     gravity: {
         map: 0.02,
         elevation: 0.005,
+    },
+
+    // The two books built from this code. Which one: BOOK in the .env file at the top of
+    // the repo (read by the Python tools and vite.config.js; src/lib/edition.js gets it from Vite).
+    //   name      – shown in the site bar, tab title and as the installed app's name
+    //   shortName – under the home-screen icon (keep it short)
+    //   accounts  – the platform parts: demo users, "Viewing as", My hikes / Shared with me,
+    //               hikes hidden from some people. false = everyone sees every hike.
+    //   outDir    – where `npm run build` puts the site (inside web/)
+    //   logo      – icon set from tools/make_icons.py: 'hb' = generic hiking logo, 'dn' = D&N logo
+    //               (tab icon, home-screen icon and the logo in the site bar)
+    editions: {
+        public: { name: 'Hiking Book', shortName: 'Hiking Book', accounts: true, outDir: 'dist', logo: 'hb' },
+        wedding: { name: 'Danna & Neil', shortName: 'D&N Hikes', accounts: false, outDir: 'dist-wedding', logo: 'dn' },
+    },
+
+    // The phone's own bars (clock + battery at the top, navigation at the bottom).
+    // The ONLY place for this: vite.config.js writes `app` into the built manifest,
+    // src/lib/full-screen.js and the full-screen map read it from here.
+    // Android only. iPhones always show the clock (the page runs behind it).
+    display: {
+        // Installed app (home-screen icon):
+        //   'standalone' – bars visible, no browser bar
+        //   'fullscreen' – bars hidden (an app installed before a change keeps
+        //                  its old setting until it's removed and installed again)
+        app: 'standalone',
+        // Full-screen map on phones: true = hide the bars while it's open
+        mapHidesBars: true,
     },
 };

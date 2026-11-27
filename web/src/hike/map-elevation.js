@@ -1173,12 +1173,13 @@ export function renderMapAndElevation(hike) {
     }
 
     // Phones: the full-screen map also hides the phone's own status and navigation
-    // bars where the browser allows it (Android). iPhones have no such API; there
+    // bars where the browser allows it (Android), if config.js display.mapHidesBars. iPhones have no such API; there
     // the map runs behind the clock and the home bar instead (viewport-fit=cover
     // + black-translucent status bar in hike.html).
     let screenFull = false; // we put the page into browser full screen
     function enterScreenFull() {
         const root = document.documentElement;
+        if (!APP_CONFIG.display.mapHidesBars) return;
         if (!compact.matches || !root.requestFullscreen || document.fullscreenElement) return;
         root.requestFullscreen({ navigationUI: 'hide' })
             .then(() => { screenFull = true; })

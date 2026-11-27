@@ -79,7 +79,7 @@ export function overviewMap(mapBox, hikes, onSelect = () => {}, onView = () => {
 
     // --- the hikes ---
     const trails = new Map();
-    const all = L.latLngBounds([]);
+    let all = L.latLngBounds([]); // the hikes shown (see setVisible)
     for (const h of hikes) {
         const pts = h.line?.length ? h.line : [h.bbox[0], [h.bbox[0][0], h.bbox[1][1]], h.bbox[1], [h.bbox[1][0], h.bbox[0][1]], h.bbox[0]];
         const bounds = L.latLngBounds(pts);
@@ -93,7 +93,7 @@ export function overviewMap(mapBox, hikes, onSelect = () => {}, onView = () => {
             .bindTooltip(h.title, { sticky: true, className: 'overview-tip' });
 
         line.addTo(map);
-        trails.set(h.id, { line, bounds });
+        trails.set(h.id, { line, bounds, shown: true });
         all.extend(bounds);
     }
 
@@ -122,6 +122,7 @@ export function overviewMap(mapBox, hikes, onSelect = () => {}, onView = () => {
     map.on('click', () => { if (!peek()) select(null); });
 
     function showAll() {
+        if (!all.isValid()) return;
         map.fitBounds(all, { ...pad(40), maxZoom: 12 });
         onView(null);
     }
@@ -134,7 +135,7 @@ export function overviewMap(mapBox, hikes, onSelect = () => {}, onView = () => {
     const stopAutoFit = () => { autoFit = false; };
     new ResizeObserver(() => {
         map.invalidateSize({ animate: false });
-        if (autoFit) map.fitBounds(all, { ...pad(40), maxZoom: 12, animate: false });
+        if (autoFit && all.isValid()) map.fitBounds(all, { ...pad(40), maxZoom: 12, animate: false });
     }).observe(mapBox);
 
     // --- tell the list what's on screen, but only after the reader moved the map
@@ -155,8 +156,9 @@ export function overviewMap(mapBox, hikes, onSelect = () => {}, onView = () => {
         if (!userMove) return;
         userMove = false;
         const view = map.getBounds();
-        const inView = new Set([...trails].filter(([, t]) => view.intersects(t.bounds)).map(([id]) => id));
-        if (inView.size === trails.size && view.contains(all)) { onView(null); return; }
+        const shown = [...trails].filter(([, t]) => t.shown);
+        const inView = new Set(shown.filter(([, t]) => view.intersects(t.bounds)).map(([id]) => id));
+        if (inView.size === shown.length && view.contains(all)) { onView(null); return; }
         const c = map.getCenter();
         onView({ center: [c.lat, c.lng], inView });
     });
@@ -236,6 +238,24 @@ export function overviewMap(mapBox, hikes, onSelect = () => {}, onView = () => {
         map,
         showAll,
         clearPlace,
+
+        /** Only draw these hikes (a list from the profile menu) and glide to them. Hidden + picked = unpicked. */
+        setVisible(ids, { animate = true } = {}) {
+            all = L.latLngBounds([]);
+            for (const [id, t] of trails) {
+                t.shown = ids.has(id);
+                if (t.shown) { t.line.addTo(map); all.extend(t.bounds); } else t.line.remove();
+            }
+            if (selected && !ids.has(selected)) select(null);
+            if (!all.isValid()) return; // empty list: leave the map where it is
+            if (animate) {
+                stopAutoFit();
+                map.flyToBounds(all, { ...pad(40), maxZoom: 12, duration: 0.7 });
+                onView(null);
+            } else {
+                showAll();
+            }
+        },
 
         /** Pick out a hike (or null to clear), as if its trail was clicked. */
         select(id) { select(id); },

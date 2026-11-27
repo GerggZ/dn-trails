@@ -2,7 +2,7 @@
 
 Set GPX_FILE below and run this file (or: python tools/new_hike.py path/to/Some_Hike.gpx).
 
-Creates hikes/<id>/ where <id> is a short random code (e.g. "k29xq1"), with
+Creates hikes/<id>/ (or wedding_hikes/<id>/ when BOOK=wedding in .env) where <id> is a short random code (e.g. "k29xq1"), with
 track.gpx, an empty photos/ folder and an info.json pre-filled from the GPX
 (title, date). Then drop your photos in photos/, fill in info.json, optionally
 write the story in description.md, and run tools/build_hikes.py.
@@ -21,13 +21,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from hikebook.gpx import read_gpx  # noqa: E402
 from hikebook.metrics import start_date  # noqa: E402
+from hikebook.book import BOOK, HIKES_DIR, id_taken  # noqa: E402
 
 # --- Settings ---
+# Which book the hike goes into (hikes/ or wedding_hikes/): BOOK in the .env file
 GPX_FILE = r""            # e.g. r"C:\Users\gregg\Downloads\Some_Hike.gpx"
 OWNER = "gregg"           # a user id from users.json
 PUBLIC = True             # False = only the owner and shared_with may see it (once logins exist)
 
-HIKES_DIR = Path(__file__).resolve().parents[1] / "hikes"
 ID_LENGTH = 6
 ID_ALPHABET = string.ascii_lowercase + string.digits
 
@@ -36,7 +37,7 @@ def new_id() -> str:
     """A random id that isn't taken yet (and isn't all digits, so it never looks like a number)."""
     while True:
         hike_id = "".join(secrets.choice(ID_ALPHABET) for _ in range(ID_LENGTH))
-        if not hike_id.isdigit() and not (HIKES_DIR / hike_id).exists():
+        if not hike_id.isdigit() and not id_taken(hike_id):
             return hike_id
 
 
@@ -67,7 +68,7 @@ def main() -> None:
         "draft": False,
     }
     (folder / "info.json").write_text(json.dumps(info, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    print(f"Created {folder}  ({info['title'] or 'untitled'})")
+    print(f"Created {folder}  ({info['title'] or 'untitled'}) in the {BOOK} book")
 
 
 if __name__ == "__main__":

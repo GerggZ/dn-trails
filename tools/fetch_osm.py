@@ -2,7 +2,8 @@
 
     python tools/fetch_osm.py
 
-For every hikes/<id>/ folder this asks OpenStreetMap (through the Overpass
+For every hikes/<id>/ folder (or wedding_hikes/<id>/ when BOOK=wedding in
+.env) this asks OpenStreetMap (through the Overpass
 API) which roads and paths lie under the trail. Each track point is matched
 to the nearest mapped way within MATCH_RADIUS_M and labelled with one of the
 three ground types the walking-time model knows (hikebook/timing.py):
@@ -40,13 +41,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from hikebook.gpx import read_gpx  # noqa: E402
 from hikebook.metrics import cumulative_distance_km  # noqa: E402
+from hikebook.book import HIKES_DIR  # noqa: E402
 
 # --- Settings when running this file directly ---
 REFRESH = False        # True = ask OpenStreetMap again even if osm.json exists
 ONLY_HIKES: list[str] = []  # hike ids (folder names), e.g. ["sgukal"]; empty = all hikes
 
 ROOT = Path(__file__).resolve().parents[1]
-HIKES_DIR = ROOT / "hikes"
 CACHE_NAME = "osm.json"
 OLD_CACHE_NAME = "osm_ground.json"  # name before Nov 2026; renamed automatically
 

@@ -12,6 +12,7 @@ import { cutOut, resample } from './lib/silhouette.js';
 import { scenery } from './lib/scenery.js';
 import { renderBackdrop } from './lib/backdrop.js';
 import { APP_CONFIG } from './config.js';
+import { BOOK_NAME } from './lib/edition.js';
 import { registerServiceWorker } from './lib/pwa.js';
 import { renderMapAndElevation } from './hike/map-elevation.js';
 import { renderGallery } from './hike/gallery.js';
@@ -36,7 +37,7 @@ function renderHero(hike) {
 }
 
 function renderHeader(hike) {
-    document.title = `${hike.title} – Hiking Book`;
+    document.title = `${hike.title} – ${BOOK_NAME}`;
     document.getElementById('title').textContent = hike.title;
     document.getElementById('subtitle').textContent =
         hike.location || '';

@@ -4,8 +4,12 @@
 // DEMO: there are no real logins. "Viewing as" in the profile menu (src/lib/profile-menu.js) picks
 // a user from data/users.json, and the rules below filter the hikes in the
 // browser. Everything is still public: anyone can open data/index.json.
+// In the wedding book (config.js editions, accounts: false) there are no users and
+// every hike is visible: Cloudflare Access locks the whole site instead.
 // Later, the inside of this file talks to a real backend that applies the
 // same rules on the server; the functions the pages call stay the same.
+
+import { ACCOUNTS } from './edition.js';
 
 const USER_KEY = 'hb-demo-user';
 
@@ -25,6 +29,7 @@ export const loadUsers = () => (usersPromise ??= getJson('data/users.json').catc
 
 /** Id of the user we're viewing as; '' = guest (not logged in). */
 export function currentUserId() {
+    if (!ACCOUNTS) return ''; // wedding book: no users
     try { return localStorage.getItem(USER_KEY) || ''; } catch { return ''; }
 }
 
@@ -48,7 +53,7 @@ export async function currentUser() {
 
 /** May `user` (null = guest) see `hike` (a card from index.json or a full hike)? */
 export function canSee(user, hike, groups = []) {
-    if (hike.public) return true;
+    if (!ACCOUNTS || hike.public) return true; // wedding book: every hike (the site itself is locked)
     if (!user) return false;
     if (user.admin || hike.owner === user.id) return true;
     const shared = hike.shared_with ?? [];
