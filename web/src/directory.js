@@ -22,6 +22,7 @@ import { findPlace, distanceToHike } from './lib/place-search.js';
 import { setupOverviewLocate } from './lib/overview-locate.js';
 import { APP_CONFIG } from './config.js';
 import { BOOK_NAME } from './lib/edition.js';
+import { setupCover } from './lib/cover.js';
 import { registerServiceWorker, setupInstallButton } from './lib/pwa.js';
 import { watchForUpdates } from './lib/version.js';
 import { keepFullScreen } from './lib/full-screen.js';
@@ -372,6 +373,7 @@ setupSheetDrag();
 setupCards();
 
 setupProfileMenu(document.getElementById('site-bar'));
+setupCover();
 
 // ---------- which list we're showing (profile menu: All hikes / My hikes / Shared with me) ----------
 // The page is built once with every hike you may see; switching lists only

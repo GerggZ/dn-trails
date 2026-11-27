@@ -29,7 +29,7 @@ const at = (p) => new URL(p, SCOPE).href;
 // Must be saved at install (or the install fails and the previous version keeps working)
 const PAGE_FILES = ['', 'index.html', 'hike.html'].map(at);
 // Nice to have
-const CORE = ['manifest.webmanifest', 'data/index.json', 'data/users.json', 'data/backgrounds.json'].map(at);
+const CORE = ['manifest.webmanifest', 'data/index.json', 'data/users.json', 'data/backgrounds.json', 'data/cover.json'].map(at);
 // Online but no answer within this time (weak signal in the mountains): use the saved page
 const PAGE_TIMEOUT_MS = 3000;
 

@@ -14,6 +14,7 @@
 import { currentUser, currentUserId, setCurrentUser, loadUsers, scopeCounts, SCOPES, el } from './data.js';
 import { offlineAvailable, downloadedHikes, removeOffline, savedIds, fmtSize, LEVELS, CHANGE_EVENT } from './offline-store.js';
 import { ACCOUNTS, BOOK_NAME } from './edition.js';
+import { loadCover, openCover } from './cover.js';
 
 const PERSON_SVG = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="8.5" r="3.8"/><path d="M4.5 20c1.2-3.6 4-5.4 7.5-5.4s6.3 1.8 7.5 5.4"/></svg>';
 // Wedding book: two people (Danna & Neil) instead of the one person
@@ -50,7 +51,7 @@ function couple(className) {
 /** Add the profile button to `bar` and build the menu. `onMainPage`: links replace the scope in place. */
 export async function setupProfileMenu(bar) {
     if (!bar) return;
-    const [user, { users }, counts] = await Promise.all([currentUser(), loadUsers(), scopeCounts()]);
+    const [user, { users }, counts, cover] = await Promise.all([currentUser(), loadUsers(), scopeCounts(), loadCover()]);
     const onMainPage = document.body.classList.contains('explore-page');
     let active = onMainPage ? currentScope() : null;
 
@@ -121,6 +122,16 @@ export async function setupProfileMenu(bar) {
 
     // Downloads: the hikes saved for offline on this device (not per user: it's the phone's storage).
     // A row in the list above (with the count) that opens a sub-page in the menu.
+    // The book's cover page (wedding book), back from anywhere
+    if (cover) {
+        const a = el('a', { href: './index.html?cover' }, el('span', { textContent: 'Cover page' }));
+        a.addEventListener('click', (e) => {
+            e.preventDefault();
+            if (onMainPage) { closeMenu(); openCover(); } else window.location.replace(a.href);
+        });
+        links.prepend(el('li', {}, a));
+    }
+
     const downloads = offlineAvailable() ? el('section', { className: 'profile-downloads', ariaLabel: 'Downloaded hikes' }) : null;
     const downloadsCount = el('span', { className: 'profile-count' });
     const updateCount = () => { downloadsCount.textContent = String(savedIds().length); };
