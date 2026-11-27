@@ -328,6 +328,47 @@ def copy_users() -> None:
     write_json(DATA_DIR / "users.json", {k: v for k, v in data.items() if not k.startswith("_")})
 
 
+COVER_FOLDER = "_cover"
+
+
+def build_cover() -> None:
+    """The book's cover page, from <hikes folder>/_cover/ (only the wedding book has one).
+
+        _cover/cover.json   {"title": "...", "subtitle": "...", "photo": "photo.jpg"}
+        _cover/message.md   the dedication (blank line = new paragraph)
+        _cover/photo.jpg    optional picture (the file named in cover.json)
+
+    Writes web/public/data/cover.json; no _cover folder = no cover page.
+    """
+    folder = HIKES_DIR / COVER_FOLDER
+    out = DATA_DIR / "cover.json"
+    out_photos = PHOTOS_DIR / COVER_FOLDER
+    if not folder.is_dir():
+        if out.exists():
+            out.unlink()
+        if out_photos.is_dir():
+            shutil.rmtree(out_photos)
+        return
+    info_file = folder / "cover.json"
+    info = json.loads(info_file.read_text(encoding="utf-8")) if info_file.exists() else {}
+    message_file = folder / "message.md"
+    message = message_file.read_text(encoding="utf-8").strip() if message_file.exists() else ""
+    photo = None
+    if info.get("photo"):
+        src = folder / info["photo"]
+        if src.exists():
+            photo = process_photo(src, out_photos, f"photos/{COVER_FOLDER}")
+        else:
+            print(f"  ! cover: photo '{info['photo']}' not found in {folder.relative_to(ROOT)}")
+    write_json(out, {
+        "title": info.get("title", ""),
+        "subtitle": info.get("subtitle", ""),
+        "message": message,
+        "photo": photo,
+    })
+    print(f"Made the cover page ({info.get('title') or 'no title'})")
+
+
 def check_access(hikes: list[dict]) -> None:
     """Warn about owners / shared_with entries that aren't in users.json."""
     if not USERS_FILE.exists():
@@ -373,7 +414,7 @@ def main() -> None:
             stale.unlink()
     if PHOTOS_DIR.is_dir():
         for stale in PHOTOS_DIR.iterdir():
-            if stale.is_dir() and stale.name not in live:
+            if stale.is_dir() and stale.name not in live and stale.name != COVER_FOLDER:
                 shutil.rmtree(stale)
 
     card_keys = ("id", "title", "date", "location", "difficulty", "owner", "public", "shared_with",
@@ -387,6 +428,7 @@ def main() -> None:
     if old_index.exists():
         old_index.unlink()
     copy_users()
+    build_cover()
     build_backgrounds()
     # Which book this data is: vite.config.js and the app (src/lib/edition.js) read it
     write_json(DATA_DIR / "edition.json", {"book": BOOK})
