@@ -5,7 +5,7 @@
 // Each saved hike has a record in localStorage (hb-saved-<id>); its photos and
 // map tiles live in the "downloads" caches (hb-dl-photos, hb-dl-tiles), apart
 // from what the reader merely looked at (hb-photos, hb-tiles: the service
-// worker trims those, see public/sw.js). Its data stays in hb-data.
+// worker trims those, see src/sw.js). Its data stays in hb-data.
 // Downloaded tiles are one shared pile (neighbouring hikes overlap), so
 // removing a hike keeps the tiles another saved hike still needs.
 //
@@ -17,6 +17,10 @@
 import { APP_CONFIG } from '../config.js';
 import { asset } from './data.js';
 import { tileUrl } from './map-layers.js';
+import { DATA, PHOTOS, TILES, DL_PHOTOS, DL_TILES, MOVED_MARK, tileKey } from './offline-common.js';
+
+// Shared with the service worker (offline-common.js); re-exported for the hike page and tests
+export { DATA, PHOTOS, TILES, DL_PHOTOS, DL_TILES, tileKey };
 
 // Two choices for how much map to save. If a hike is too big for the tile
 // limit, the deepest zoom levels are left out until it fits.
@@ -28,13 +32,6 @@ export const PARALLEL = 4;
 // Rough size of one map picture per layer (KB), for maps whose server hides the
 // real size (no cors). Where the server allows it the real size is used.
 export const TILE_KB = { park: 35, streets: 20, satellite: 30, topo: 22 };
-
-// The caches (same names as in public/sw.js)
-export const DATA = 'hb-data';
-export const PHOTOS = 'hb-photos';
-export const TILES = 'hb-tiles';
-export const DL_PHOTOS = 'hb-dl-photos';
-export const DL_TILES = 'hb-dl-tiles';
 
 /** The map "Save for offline" stores: the first layer marked offline: true in config.js (else the first one). */
 export function offlineLayer() {
@@ -58,9 +55,6 @@ export const savedKey = (id) => `${PREFIX}${id}`;
 
 /** Offline saving only exists in the built site, with a service worker. */
 export const offlineAvailable = () => import.meta.env.PROD && 'caches' in window && 'serviceWorker' in navigator;
-
-/** Same normalisation as tileKey() in sw.js: a./b./c.tile -> a.tile */
-export const tileKey = (url) => url.replace(/^https:\/\/[abc]\.tile\./, 'https://a.tile.');
 
 function tileXY(lat, lon, z) {
     const n = 2 ** z;
@@ -243,8 +237,8 @@ export async function moveToDownloads(from, to, url) {
     return true;
 }
 
-// Mark for the service worker: old downloads have been moved (see MOVED_MARK in sw.js)
-const movedMark = () => new URL(asset('__hb-downloads-moved'), location.href).href;
+// Mark for the service worker: old downloads have been moved (see MOVED_MARK in offline-common.js)
+const movedMark = () => new URL(asset(MOVED_MARK), location.href).href;
 
 /**
  * Once per device: downloads made before the two piles existed sit in the

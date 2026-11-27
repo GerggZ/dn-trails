@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <link rel="icon" type="image/png" href="./icons/dn-favicon-64.png">
+    <link rel="manifest" href="./manifest.webmanifest">
+    <meta name="theme-color" content="#E9ECDA">
+    <link rel="apple-touch-icon" href="./icons/dn-apple-touch-180.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="Hiking Book">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Privacy – Hiking Book</title>
+</head>
+<body>
+    <!-- Privacy notice. Parts marked data-book="public" / "wedding" only show in that book (src/privacy.js).
+         Keep it in step with what the code does: hosting, map servers, place search, Sentry, device storage. -->
+    <header class="site-bar">
+        <a class="home" href="./index.html"><img class="home-logo" src="./icons/dn-logo.svg" alt="">Hiking Book</a>
+        <a class="back" href="./index.html">All hikes</a>
+    </header>
+
+    <div class="sheet">
+    <main class="page legal">
+        <h1>Privacy</h1>
+        <p class="legal-updated">Last updated: 28 November 2026</p>
+
+        <p>This book has no accounts you sign up for, no cookies, no analytics and no ads. This page lists everything that happens with data when you use it.</p>
+
+        <h2>Who is responsible</h2>
+        <p>The person who runs this book. Contact details will be added here before the book is shared publicly.</p>
+
+        <h2>Hosting</h2>
+        <p data-book="public">The book is hosted on GitHub Pages (GitHub, Inc., USA). Like any web server, it receives your IP address and the pages you request, and may keep them in short-term server logs for security and operation.</p>
+        <p data-book="wedding">The book is hosted on Cloudflare Pages and locked with Cloudflare Access (Cloudflare, Inc.). Cloudflare receives your IP address and the pages you request, and the email address you sign in with, to check that you're allowed in.</p>
+
+        <h2>Maps</h2>
+        <p>Map pictures are loaded from the servers of the map you choose: OpenTopoMap (default), OpenStreetMap, or Esri (Satellite, Topo). Your browser asks them for the part of the map on screen, so they receive your IP address and that map area. Saved offline maps come from your device, not from these servers.</p>
+
+        <h2>Place search</h2>
+        <p>When you search for a place on the main page, the search text is sent to OpenStreetMap's place search (Nominatim, OpenStreetMap Foundation), which receives your IP address. Nothing is sent unless you search.</p>
+
+        <h2>Your location</h2>
+        <p>The location button shows where you are on the map. Your position is only used on your device, only after you tap the button and allow it, and is never sent anywhere.</p>
+
+        <h2>Error reports</h2>
+        <p>If something breaks, a short error report is sent to Sentry (Functional Software, Inc.), stored in the EU (Frankfurt). It contains the error and where in the code it happened, your browser and system, the book's version, whether it runs as an installed app, the last few steps before the error (for example which button was tapped or which file was loaded), and an approximate location (city) that Sentry derives from your connection. Your IP address is not stored. This is only used to find and fix bugs (legitimate interest, Art. 6(1)(f) GDPR).</p>
+        <p data-book="public">If you're offline, error reports are not saved, they're simply dropped.</p>
+        <p data-book="wedding">If you're offline, an error report waits on your device and is sent once you're back online.</p>
+
+        <h2>Stored on your device</h2>
+        <p>To work offline and remember your choices, the book stores things in your browser: the pages and code, hikes you've opened or saved for offline (text, photos, map pictures), and small settings such as the map you picked or your walking pace. This stays on your device and is only used to give you what you asked for. You can remove saved hikes in the menu under Downloads, or everything by clearing this site's data in your browser settings.</p>
+
+        <h2>Providers outside the EU</h2>
+        <p>Some of these providers are based in the USA. Where data goes there, the transfer is based on the safeguards they provide, such as the EU–US Data Privacy Framework or Standard Contractual Clauses.</p>
+
+        <h2>Your rights</h2>
+        <p>Under the GDPR you can ask what data about you is processed, and have it corrected, deleted or restricted, object to its processing, and receive it in a portable form. You can also complain to a data protection supervisory authority, for example the one where you live.</p>
+    </main>
+    </div>
+
+    <script type="module" src="/src/privacy.js"></script>
+</body>
+</html>

@@ -2,7 +2,7 @@
 // trail without signal: its data, photos and the map tiles around it.
 //
 // Stores into the "downloads" caches (hb-dl-photos, hb-dl-tiles), which the
-// service worker (public/sw.js) reads first and never trims. Files already in
+// service worker (src/sw.js) reads first and never trims. Files already in
 // the browsing caches are moved over instead of downloaded again. Only shown in
 // the built, installed-able site (the service worker isn't active in `npm run dev`).
 // A phone that runs out of space: the download stops, what this run added is
@@ -18,34 +18,15 @@ import {
     offlineAvailable, offlineLayer, tileUrls, runLimited, readSaved, writeSaved, removeOffline,
     moveToDownloads, keepStorage, isQuotaError,
 } from '../lib/offline-store.js';
+import { fetchTile, refusesCors } from '../lib/offline-common.js';
 
 class OutOfSpace extends Error {}
 
-// Map servers that answer "cors" requests (then the saved piece has a real, visible size;
-// opaque pieces are counted by Chrome as ~7 MB each against the storage limit).
-// Learned while downloading: once a server answered one cors request it counts as
-// cors-friendly, and a later failed cors request is only retried the plain way for that
-// one piece. A server counts as "no cors" only after its first few cors tries all failed.
-const corsHosts = new Map(); // hostname -> true | number of failed cors tries so far
-const NO_CORS_AFTER = 3;
-
 /** One map piece, straight from the network (cache: 'no-store' = past the service worker). */
-async function fetchTile(url) {
-    const host = new URL(url).hostname;
-    const known = corsHosts.get(host);
-    if (known === true || (known ?? 0) < NO_CORS_AFTER) {
-        try {
-            const response = await fetch(url, { mode: 'cors', credentials: 'omit', cache: 'no-store' });
-            corsHosts.set(host, true);
-            return response;
-        } catch { /* this server doesn't allow it (or a hiccup): the plain way, for this piece */ }
-        if (corsHosts.get(host) !== true) corsHosts.set(host, (corsHosts.get(host) ?? 0) + 1);
-    }
-    return fetch(url, { mode: 'no-cors', cache: 'no-store' });
-}
+const downloadTile = (url) => fetchTile(url, { cache: 'no-store' });
 
-/** Saved piece that Chrome can't measure (opaque), from a server that does allow cors: worth fetching again. */
-const upgradable = (hit, url) => hit?.type === 'opaque' && corsHosts.get(new URL(url).hostname) !== NO_CORS_AFTER;
+/** Saved piece that Chrome can't measure (opaque), from a server that may allow cors: worth fetching again. */
+const upgradable = (hit, url) => hit?.type === 'opaque' && !refusesCors(url);
 
 const fmtMB = (tiles) => {
     const mb = (tiles * (TILE_KB[offlineLayer().id] ?? 30)) / 1024;
@@ -157,7 +138,7 @@ export function setupOfflineSave(hike, button, statusEl) {
                 // "Update offline copy" also swaps opaque pieces for measurable ones where the server allows it
                 if (!have || upgradable(have, url)) {
                     let response = null;
-                    try { response = await fetchTile(url); } catch { /* counted below */ }
+                    try { response = await downloadTile(url); } catch { /* counted below */ }
                     if (response && (response.ok || (!have && response.type === 'opaque'))) {
                         if (!(have && response.type === 'opaque')) await store(tiles, url, response);
                     } else if (!have) failed++;

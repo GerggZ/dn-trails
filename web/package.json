@@ -28,6 +28,7 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.65.1",
+    "@sentry/vite-plugin": "^11.20.0",
     "eslint": "^10.16.0",
     "gh-pages": "^6.1.1",
     "globals": "^17.14.0",

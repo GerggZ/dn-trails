@@ -8,7 +8,7 @@ export const APP_CONFIG = {
     // Maps the reader can pick with the layer button on the hike map.
     // The first one is the default (and is used for the 'map' backdrop).
     // look: optional tint from src/styles/map-styles.css (.map-style-<look>).
-    // A new map address also needs its host in TILE_HOSTS in public/sw.js (offline use).
+    // A new map address also needs its host in TILE_HOSTS in src/lib/offline-common.js (offline use).
     // offline: true = the map "Save for offline" stores (the first one marked; whatever map is on
     // screen). Only Park: OpenStreetMap's tile servers forbid saving for offline, and Esri only
     // allows it through their own apps.

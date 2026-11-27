@@ -764,9 +764,7 @@ export function renderMapAndElevation(hike) {
             if (event.ctrlKey) {
                 zoomBy = dy * PINCH_SPEED;
                 dx = 0;
-            } else if (Math.abs(dx) > Math.abs(dy)) {
-                dy = 0;
-            } else {
+            } else if (Math.abs(dx) <= Math.abs(dy)) { // mostly up/down = zoom, else sideways = move
                 zoomBy = dy * SCROLL_SPEED;
                 dx = 0;
             }

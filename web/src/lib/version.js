@@ -10,7 +10,11 @@ export function showVersion() {
     const host = document.querySelector('.sheet') ?? document.body;
     const line = document.createElement('p');
     line.className = 'app-version';
-    line.textContent = `Version: ${APP_VERSION}`;
+    line.textContent = `Version: ${APP_VERSION} · `;
+    const privacy = document.createElement('a');
+    privacy.href = './privacy.html';
+    privacy.textContent = 'Privacy';
+    line.append(privacy);
     host.append(line);
 }
 

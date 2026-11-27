@@ -1,18 +1,19 @@
 // Error reports (Sentry, EU region): when the book breaks on someone's phone or
-// computer, the error and where it happened arrive in Gregg's Sentry project
-// "hiking-book", with an email for each new kind of error.
+// computer, the error and where it happened show up under Issues in Gregg's
+// Sentry project "hiking-book".
 //
 // - Only in the built site (not npm run dev) and not in the automatic browser tests.
-// - No IP addresses (dataCollection.userInfo: false), no names, no session replays,
-//   no performance tracing: only errors. Second lock in Sentry: Project Settings →
-//   hiking-book → Security & Privacy → "Prevent Storing of IP Addresses".
-// - Offline (on the trail), reports wait on the device and are sent once there's signal.
-// - Each report says which book (wedding / public) and which version.
+// - Only errors: no IP addresses or other user info, no session replays, no tracing.
+// - Wedding book: reports made offline (on the trail) wait on the device and are sent
+//   once there's signal. Public book: offline reports are dropped (see privacy.html).
+// - Each report says which book (wedding / public), which version, and whether the
+//   book runs as the installed app.
 //
 // The DSN isn't a secret: it only allows sending reports to this project, not reading them.
 
 /* global __APP_VERSION__, __BOOK__ */
 import * as Sentry from '@sentry/browser';
+import { isInstalled } from './pwa.js';
 
 const DSN = 'https://62f73bf94a1c9b57451822405bd78a38@o4512506046054400.ingest.de.sentry.io/4512506057457744';
 
@@ -23,19 +24,35 @@ export function setupErrorReports() {
             dsn: DSN,
             environment: __BOOK__,
             release: __APP_VERSION__,
-            // No IP address or other user info. In Sentry 11 this is the switch that counts
-            // (the old sendDefaultPii no longer does it): with userInfo on (the default) the
-            // SDK asks Sentry's server to fill in the sender's IP ("infer_ip": "auto").
+            // No user info: also stops Sentry's server from filling in the sender's IP
             dataCollection: { userInfo: false },
-            // Saved on the device while offline, sent later
-            transport: Sentry.makeBrowserOfflineTransport(Sentry.makeFetchTransport),
-            // Errors from browser extensions etc. aren't the book's
+            // Wedding book: reports made offline wait on the device and go out later.
+            // Public book: no (storing them on visitors' devices would need consent).
+            ...(__BOOK__ === 'wedding' ? { transport: Sentry.makeBrowserOfflineTransport(Sentry.makeFetchTransport) } : {}),
+            // Only errors from the book's own code (not from browser extensions)
             allowUrls: [location.origin],
-            beforeSend(event) {
-                delete event.user; // nothing about who it was (no ip_address field either)
-                return event;
-            },
+            // The steps before an error include the addresses the page fetched; a place
+            // search's address holds what the reader typed. Keep only where it went.
+            beforeBreadcrumb: withoutSearchText,
         });
-        Sentry.setTag('installed', window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true);
+        Sentry.setTag('installed', isInstalled());
     } catch { /* reporting must never break the book */ }
+}
+
+// Place search (src/lib/place-search.js) puts the search text in the address
+const SEARCH_HOSTS = ['nominatim.openstreetmap.org'];
+
+/** A fetch step to the place search: drop the address's query (the search text). */
+function withoutSearchText(breadcrumb) {
+    const data = breadcrumb.data;
+    if (!data?.url) return breadcrumb;
+    try {
+        const url = new URL(data.url, location.href);
+        if (SEARCH_HOSTS.includes(url.hostname)) {
+            data.url = `${url.origin}${url.pathname}`;
+            delete data['http.query'];
+            delete data['http.fragment'];
+        }
+    } catch { /* not an address: leave it */ }
+    return breadcrumb;
 }

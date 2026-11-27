@@ -1,4 +1,4 @@
-// Registers the service worker (public/sw.js) so the book can be installed
+// Registers the service worker (src/sw.js, built into dist/sw.js) so the book can be installed
 // and read offline. Only in the built site: in `npm run dev` it would cache
 // files that change on every save.
 

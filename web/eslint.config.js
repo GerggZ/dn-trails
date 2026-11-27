@@ -15,7 +15,7 @@ export default [
     },
     {
         // The service worker
-        files: ['public/sw.js'],
+        files: ['src/sw.js'],
         languageOptions: { globals: { ...globals.serviceworker } },
     },
     {

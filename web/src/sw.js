@@ -16,23 +16,24 @@
 // Requests made with cache: 'no-store' are left alone (straight to the network):
 // the download code and version check use that to get fresh copies.
 //
-// VERSION is replaced with the build's version stamp on every `npm run build`
-// (see vite.config.js), so each deploy installs a fresh service worker:
-// new pages, and the saved hike data refreshed. The value here is only used
-// if sw.js is served without building.
+// This file isn't served as it is: `npm run build` bundles it (with the shared
+// src/lib/offline-common.js) into dist/sw.js, see vite.config.js. The build also
+// fills in the two values below, so each deploy installs a fresh service worker:
+// new pages, and the saved hike data refreshed.
 
-const VERSION = 'v5';
-// This build's JS, CSS and fonts (assets/…), filled in on every `npm run build`
-// (see vite.config.js). Saved at install, so the book opens offline even if a
-// page was never opened online since the last update.
-const BUILD_FILES = [];
+/* global __SW_VERSION__, __BUILD_FILES__ */
+import {
+    DATA, PHOTOS, TILES, DL_PHOTOS, DL_TILES, MOVED_MARK as MOVED_MARK_PATH,
+    TILE_HOSTS, tileKey, fetchTile,
+} from './lib/offline-common.js';
+
+// The build's version stamp
+const VERSION = __SW_VERSION__;
+// This build's JS, CSS and fonts (assets/…). Saved at install, so the book opens
+// offline even if a page was never opened online since the last update.
+const BUILD_FILES = __BUILD_FILES__;
 const PAGES = `hb-pages-${VERSION}`;
 const ASSETS = 'hb-assets';
-const DATA = 'hb-data';
-const PHOTOS = 'hb-photos';        // browsing
-const TILES = 'hb-tiles';          // browsing
-const DL_PHOTOS = 'hb-dl-photos';  // downloads
-const DL_TILES = 'hb-dl-tiles';    // downloads
 const MAX_TILES = 3000;                    // ≈ 75 MB of map you looked at
 const MAX_PHOTO_BYTES = 100 * 1024 * 1024; // photos you looked at
 const TRIM_EVERY = 25;                     // check the limits after this many new files
@@ -41,25 +42,17 @@ const SCOPE = self.registration.scope; // e.g. https://you.github.io/hiking-book
 const at = (p) => new URL(p, SCOPE).href;
 // Written by the page (offline-store.js) once downloads made before the two piles
 // existed were moved to hb-dl-*. Until then nothing is trimmed, so no download is lost.
-const MOVED_MARK = at('__hb-downloads-moved');
+const MOVED_MARK = at(MOVED_MARK_PATH);
 // Must be saved at install (or the install fails and the previous version keeps working)
 const PAGE_FILES = ['', 'index.html', 'hike.html'].map(at);
 // Nice to have
-const CORE = ['manifest.webmanifest', 'icons/dn-logo.svg', 'data/index.json', 'data/users.json', 'data/backgrounds.json', 'data/cover.json'].map(at);
+const CORE = ['manifest.webmanifest', 'privacy.html', 'icons/dn-logo.svg', 'data/index.json', 'data/users.json', 'data/backgrounds.json', 'data/cover.json'].map(at);
 // Online but no answer within this time (weak signal in the mountains): use the saved page
 const PAGE_TIMEOUT_MS = 3000;
 // Saved copies are looked up ignoring the server's Vary header: some hosts answer with
 // "Vary: Origin", and a module script asks with an Origin header while the copy saved at
 // install didn't, so the browser would think they differ and miss the saved copy offline.
 const MATCH = { ignoreVary: true };
-
-// Map pictures for every map in config.js mapLayers (OpenTopoMap, OpenStreetMap, Esri)
-const TILE_HOSTS = /(^|\.)tile\.opentopomap\.org$|(^|\.)tile\.openstreetmap\.org$|(^|\.)arcgisonline\.com$/;
-
-/** Same tile from a.tile / b.tile / c.tile -> one cache entry. */
-function tileKey(url) {
-    return url.replace(/^https:\/\/[abc]\.tile\./, 'https://a.tile.');
-}
 
 self.addEventListener('install', (event) => {
     event.waitUntil((async () => {
@@ -94,7 +87,7 @@ self.addEventListener('activate', (event) => {
         for (const name of await caches.keys()) {
             if (name.startsWith('hb-pages-') && name !== PAGES) await caches.delete(name);
         }
-        // Drop JS/CSS of older builds (not when sw.js runs unbuilt: the list is empty then)
+        // Drop JS/CSS of older builds
         if (BUILD_FILES.length) {
             const keep = new Set(BUILD_FILES.map(at));
             const assets = await caches.open(ASSETS);
@@ -206,31 +199,6 @@ async function photo(request, event) {
     return response;
 }
 
-// Map servers that answer "cors" requests: then the saved piece is a normal file the
-// browser can measure. Others only give opaque answers (size hidden, and Chrome counts
-// each one as ~7 MB against the storage limit). Learned per server: once one cors
-// request worked it stays cors-friendly (a later failure only falls back for that piece);
-// "no cors" only after the first few tries all failed while the plain way worked.
-const corsHosts = new Map(); // hostname -> true | number of failed cors tries
-const NO_CORS_AFTER = 3;
-
-/** A map piece from the network: as a cors request where the server allows it. */
-async function fetchTile(request) {
-    const host = new URL(request.url).hostname;
-    const known = corsHosts.get(host);
-    if (known === true || (known ?? 0) < NO_CORS_AFTER) {
-        try {
-            const response = await fetch(new Request(request.url, { mode: 'cors', credentials: 'omit' }));
-            corsHosts.set(host, true);
-            return response;
-        } catch { /* no cors on this server, a hiccup, or offline: try the plain way */ }
-        const response = await fetch(request);
-        if (response.type === 'opaque' && corsHosts.get(host) !== true) corsHosts.set(host, (corsHosts.get(host) ?? 0) + 1);
-        return response;
-    }
-    return fetch(request);
-}
-
 async function tile(request, event) {
     const key = tileKey(request.url);
     const dl = await (await caches.open(DL_TILES)).match(key, MATCH);
@@ -239,7 +207,7 @@ async function tile(request, event) {
     const hit = await browse.match(key, MATCH);
     if (hit) { touch(browse, key, hit, event); return hit; }
     try {
-        const response = await fetchTile(request);
+        const response = await fetchTile(request.url, { fallback: request });
         if (response.ok || response.type === 'opaque') keep(browse, key, response.clone(), event);
         return response;
     } catch {

@@ -1,7 +1,8 @@
-import { defineConfig } from 'vite';
+import { defineConfig, build } from 'vite';
 import { resolve } from 'node:path';
 import { execSync } from 'node:child_process';
 import { readFileSync, writeFileSync, readdirSync, existsSync } from 'node:fs';
+import { sentryVitePlugin } from '@sentry/vite-plugin';
 import { APP_CONFIG } from './src/config.js';
 
 // Every build gets a version stamp: when it was built + the git commit
@@ -9,6 +10,27 @@ import { APP_CONFIG } from './src/config.js';
 // version.json, which the book checks to tell you a newer version is out.
 // The same stamp goes into dist/sw.js, so every deploy also refreshes the
 // offline copy on phones (no more bumping VERSION by hand).
+
+// The service worker (src/sw.js + the shared src/lib/offline-common.js) is bundled
+// on its own into one plain script, dist/sw.js: a service worker can't load the
+// site's module chunks. `version` and `files` (assets/… to save at install) are filled in.
+async function buildServiceWorker(outDir, version, files) {
+  await build({
+    configFile: false,
+    root: import.meta.dirname,
+    publicDir: false,
+    logLevel: 'warn',
+    define: { __SW_VERSION__: JSON.stringify(version), __BUILD_FILES__: JSON.stringify(files) },
+    build: {
+      outDir,
+      emptyOutDir: false,
+      copyPublicDir: false,
+      minify: false,
+      sourcemap: false,
+      lib: { entry: resolve(import.meta.dirname, 'src', 'sw.js'), formats: ['iife'], name: 'hbServiceWorker', fileName: () => 'sw.js' },
+    },
+  });
+}
 function buildVersion() {
   const when = new Intl.DateTimeFormat('en-GB', {
     timeZone: 'Europe/Berlin', day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
@@ -47,11 +69,29 @@ function currentBook(command) {
   return book;
 }
 
+// Source maps for Sentry (readable file + line in error reports): only when the
+// .env file has SENTRY_AUTH_TOKEN (secret, never commit it). The build uploads
+// the maps to Sentry and then deletes them, so they never go online.
+function sentrySourceMaps(command, version, outDir) {
+  const token = readEnv(resolve(import.meta.dirname, '..', '.env')).SENTRY_AUTH_TOKEN;
+  if (command !== 'build' || !token) return null;
+  return sentryVitePlugin({
+    org: 'greggory-xo',
+    project: 'hiking-book',
+    url: 'https://de.sentry.io/', // EU region
+    authToken: token,
+    release: { name: version, inject: false }, // same name as `release` in src/lib/errors.js
+    sourcemaps: { filesToDeleteAfterUpload: [`${outDir}/**/*.map`] },
+    telemetry: false,
+  });
+}
+
 export default defineConfig(({ command }) => {
   const version = command === 'build' ? buildVersion() : 'dev';
   const book = currentBook(command);
   const edition = APP_CONFIG.editions[book];
   let outDir = edition.outDir;
+  const sourceMaps = sentrySourceMaps(command, version, edition.outDir);
   return {
     // Relative paths, so the built site in dist/ works from any folder or host
     base: './',
@@ -59,10 +99,13 @@ export default defineConfig(({ command }) => {
     build: {
       outDir: edition.outDir,
       emptyOutDir: true,
+      // 'hidden': maps are made (for Sentry) but the code doesn't point to them
+      sourcemap: sourceMaps ? 'hidden' : false,
       rollupOptions: {
         input: {
           index: resolve(import.meta.dirname, 'index.html'),
           hike: resolve(import.meta.dirname, 'hike.html'),
+          privacy: resolve(import.meta.dirname, 'privacy.html'),
         },
       },
     },
@@ -82,20 +125,14 @@ export default defineConfig(({ command }) => {
         generateBundle() {
           this.emitFile({ type: 'asset', fileName: 'version.json', source: JSON.stringify({ version }) });
         },
-        closeBundle() {
-          // public/sw.js is copied as-is; stamp the build's version into the copy
-          const sw = resolve(outDir, 'sw.js');
-          const text = readFileSync(sw, 'utf8');
-          const stamped = text.replace(/^const VERSION = .*$/m, `const VERSION = ${JSON.stringify(version)};`);
-          if (stamped === text) throw new Error('version-stamp: no "const VERSION = …" line found in sw.js');
-          // ...and the list of files the pages need, so the service worker saves them at install
-          // (fonts: only the latin sets, the others are never downloaded for our text)
+        async closeBundle() {
+          // The service worker, with this build's version and the files the pages need,
+          // so it saves them at install (fonts: only the latin sets, the others are
+          // never downloaded for our text)
           const files = readdirSync(resolve(outDir, 'assets'))
             .filter((f) => /\.(js|css|png|svg)$/.test(f) || (/\.woff2$/.test(f) && /-latin-/.test(f)))
             .map((f) => `assets/${f}`);
-          const listed = stamped.replace(/^const BUILD_FILES = .*$/m, `const BUILD_FILES = ${JSON.stringify(files)};`);
-          if (listed === stamped) throw new Error('version-stamp: no "const BUILD_FILES = …" line found in sw.js');
-          writeFileSync(sw, listed);
+          await buildServiceWorker(outDir, version, files);
           // The installed app's display mode comes from config.js (display.app), not public/
           const mode = APP_CONFIG.display?.app;
           if (!['standalone', 'fullscreen'].includes(mode)) throw new Error(`config.js display.app must be 'standalone' or 'fullscreen', not ${JSON.stringify(mode)}`);
@@ -110,6 +147,7 @@ export default defineConfig(({ command }) => {
           console.log(`\n  ${edition.name} (${book} book) -> ${edition.outDir}/  version: ${version}  (installed app: ${mode})\n`);
         },
       },
-    ],
+      sourceMaps,
+    ].filter(Boolean),
   };
 });
