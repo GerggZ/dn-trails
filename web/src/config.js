@@ -14,7 +14,7 @@ export const APP_CONFIG = {
     // allows it through their own apps.
     mapLayers: [
         {
-            id: 'park', name: 'Park map', look: 'park', offline: true,
+            id: 'park', name: 'Default', look: 'park', offline: true,
             url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', maxZoom: 17,
             attribution: '© OpenStreetMap · SRTM · OpenTopoMap (CC-BY-SA)',
         },

@@ -451,3 +451,38 @@
 }
 .scope-x { font-size: 1.1em; line-height: 1; padding: 0 4px; }
 .scope-clear:hover { border-color: var(--accent); }
+
+/* ---------- offline: what's on this device (directory.js) ---------- */
+.hike-title .offline-mark {
+    display: none;
+    margin-left: 6px;
+    vertical-align: 0.05em;
+    color: var(--ink-soft);
+}
+.hike-row[data-offline='downloaded'] .offline-mark { display: inline-block; }
+.is-offline .hike-row[data-offline='cached'] .offline-mark { display: inline-block; opacity: 0.55; }
+.is-offline .panel .hike-row[data-offline='none'] { opacity: 0.45; }
+
+.offline-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin: -4px 8px 12px 0;
+    padding: 3px 10px 3px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--rule);
+    background: color-mix(in srgb, var(--paper) 55%, transparent);
+    color: var(--ink-soft);
+    font-family: var(--font-sign);
+    font-size: var(--step--1);
+    font-weight: 600;
+    cursor: pointer;
+}
+.offline-chip[aria-pressed='true'] { color: var(--ink); border-color: var(--ink-soft); }
+.offline-chip:hover { border-color: var(--ink-soft); }
+.offline-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--soft);
+}

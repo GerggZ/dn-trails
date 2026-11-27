@@ -59,7 +59,8 @@ function showCover(cover) {
     page.setAttribute('aria-modal', 'true');
     document.body.append(page);
     document.documentElement.classList.add('cover-showing');
-    open.focus({ preventScroll: true });
+    // Keyboard users start on the button; on touch screens that would only draw a focus ring
+    if (window.matchMedia('(hover: hover)').matches) open.focus({ preventScroll: true });
 
     function close() {
         try { sessionStorage.setItem(SEEN_KEY, '1'); } catch { /* ignore */ }

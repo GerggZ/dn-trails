@@ -519,6 +519,16 @@ img { display: block; max-width: 100%; }
 }
 .profile-download-list a:hover { background: color-mix(in srgb, var(--ink) 7%, transparent); }
 .profile-download-list small { font-size: var(--step--1); font-weight: 500; color: var(--ink-soft); }
+/* "Cached" below the downloads: hikes opened before (text and route on this device) */
+.profile-sub-title {
+    margin: 14px 12px 2px;
+    font-family: var(--font-sign);
+    font-size: var(--step--1);
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+}
 .profile-remove {
     display: inline-grid;
     place-items: center;
@@ -560,48 +570,58 @@ img { display: block; max-width: 100%; }
 .demo-note { margin: 0; color: var(--ink-soft); line-height: 1.35; }
 
 /* --- Cover page (wedding_hikes/_cover, src/lib/cover.js) --- */
+/* Always one screen: the photo takes whatever height is left (cropped to fit),
+   text and logo scale with the screen height. Only a very long message scrolls. */
 .cover {
     position: fixed;
     inset: 0;
     z-index: 1800; /* over the map, list and menu; under the photo viewer and update banner */
+    box-sizing: border-box;
+    height: 100dvh;
     overflow-y: auto;
     display: flex;
     justify-content: center;
     background: var(--paper);
-    padding: max(36px, calc(env(safe-area-inset-top) + 16px)) var(--gutter) max(36px, calc(env(safe-area-inset-bottom) + 16px));
+    padding: max(20px, calc(env(safe-area-inset-top) + 12px)) var(--gutter) max(20px, calc(env(safe-area-inset-bottom) + 12px));
     transition: opacity 0.45s ease;
 }
 .cover.cover-leaving { opacity: 0; pointer-events: none; }
 .cover-page {
     width: 100%;
     max-width: 540px;
-    margin: auto 0; /* centered when short, scrolls when long */
+    height: 100%;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 18px;
+    justify-content: center;
+    gap: clamp(8px, 1.8dvh, 18px);
     text-align: center;
 }
-.cover-logo { width: clamp(110px, 32vw, 160px); height: auto; }
+.cover-page > * { flex-shrink: 0; }
+.cover-logo { width: min(clamp(110px, 32vw, 160px), 15dvh); height: auto; }
 .cover-title {
     margin: 0;
     font-family: var(--font-sign);
-    font-size: var(--step-5);
+    font-size: min(var(--step-5), 7dvh);
     font-weight: 700;
     line-height: 1;
     color: var(--ink);
 }
 .cover-subtitle {
-    margin: -8px 0 0;
+    margin: -6px 0 0;
     font-family: var(--font-book);
-    font-size: var(--step-1);
+    font-size: min(var(--step-1), 2.8dvh);
     font-style: italic;
     color: var(--ink-soft);
 }
 .cover-photo {
+    flex: 0 1 auto; /* the one part that gives way */
     width: 100%;
     height: auto;
-    margin: 6px 0;
+    min-height: 110px;
+    max-height: 45dvh;
+    object-fit: cover;
+    margin: 4px 0;
     border-radius: 6px;
     box-shadow: 0 1px 4px rgb(0 0 0 / 0.18);
 }
@@ -609,9 +629,9 @@ img { display: block; max-width: 100%; }
     margin: 0;
     max-width: 34em;
     font-family: var(--font-book);
-    font-size: var(--step-0);
-    line-height: 1.6;
+    font-size: clamp(0.9rem, 2.1dvh, var(--step-0));
+    line-height: 1.5;
     color: var(--ink);
 }
-.cover-open { margin-top: 8px; }
+.cover-open { margin-top: 4px; }
 html.cover-showing { overflow: hidden; }

@@ -196,7 +196,7 @@ export function renderMapAndElevation(hike) {
         },
     }))());
 
-    addMapLayers(map); // Park map / Streets / Satellite / Topo, with a layer button (config.js mapLayers)
+    addMapLayers(map); // Default (park look) / Streets / Satellite / Topo, with a layer button (config.js mapLayers)
 
     // The trail: one solid line, like on a printed park map (optional light edge underneath)
     const latlngs = data.map((d) => [d.lat, d.lon]);

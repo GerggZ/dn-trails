@@ -1,7 +1,8 @@
 // Profile button (top right of the site bar, where a login button would go)
 // and the side menu it opens from the right:
 //   who you are · All hikes / My hikes / Shared with me / Downloads › · (demo) Viewing as
-// "Downloads" opens a sub-page inside the menu: the hikes saved for offline, their sizes, remove.
+// "Downloads" opens a sub-page inside the menu: the hikes saved for offline, their sizes, remove;
+// below them "Cached": hikes opened before, whose text and route are on this device too.
 // Picking a list opens the main page filtered to it (index.html?show=mine).
 //
 // DEMO: "Viewing as" switches the pretend user; the page reloads so everything
@@ -12,7 +13,7 @@
 // only Downloads (not in npm run dev, where offline doesn't work).
 
 import { currentUser, currentUserId, setCurrentUser, loadUsers, scopeCounts, SCOPES, el } from './data.js';
-import { offlineAvailable, downloadedHikes, removeOffline, savedIds, fmtSize, LEVELS, CHANGE_EVENT } from './offline-store.js';
+import { offlineAvailable, downloadedHikes, cachedHikes, removeOffline, savedIds, fmtSize, LEVELS, CHANGE_EVENT } from './offline-store.js';
 import { ACCOUNTS, BOOK_NAME } from './edition.js';
 import { loadCover, openCover } from './cover.js';
 
@@ -149,7 +150,7 @@ export async function setupProfileMenu(bar) {
     let busy = false;
     async function renderDownloads(message = '') {
         if (!downloads || busy) return;
-        const { hikes, total } = await downloadedHikes();
+        const [{ hikes, total }, cached] = await Promise.all([downloadedHikes(), cachedHikes()]);
         const status = el('p', { className: 'profile-hint', role: 'status', textContent: message });
 
         const remove = async (ids, question) => {
@@ -176,6 +177,12 @@ export async function setupProfileMenu(bar) {
         const all = hikes.length > 1 ? el('button', { type: 'button', className: 'pill', textContent: `Remove all · ${fmtSize(total)}` }) : null;
         all?.addEventListener('click', () => remove(hikes.map((h) => h.id), `Remove all ${hikes.length} downloaded hikes (${fmtSize(total)}) from this device?`));
 
+        const cachedList = cached.length ? el('ul', { className: 'profile-download-list profile-cached-list' }, cached.map((h) => {
+            const a = el('a', { href: hikeUrl(h.id) }, el('span', { textContent: h.title }));
+            a.addEventListener('click', (e) => { e.preventDefault(); window.location.replace(a.href); });
+            return el('li', {}, a);
+        })) : null;
+
         updateCount();
         downloads.replaceChildren(...[
             el('header', { className: 'profile-sub-head' }, back, el('h2', { textContent: 'Downloads' })),
@@ -185,6 +192,8 @@ export async function setupProfileMenu(bar) {
             hikes.length ? list : el('p', { className: 'profile-hint', textContent: 'No hikes saved for offline.' }),
             all,
             status,
+            cachedList && el('h3', { className: 'profile-sub-title', textContent: 'Cached' }),
+            cachedList,
         ].filter(Boolean)); // replaceChildren would write a missing button as the text "null"
     }
     window.addEventListener(CHANGE_EVENT, () => {

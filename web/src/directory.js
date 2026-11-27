@@ -5,6 +5,8 @@
 //   swipe it for the hikes nearest to that one
 // - search a place: hikes sorted nearest first; zoom/pan the map: hikes on screen first
 // - location button: the hike(s) you're at stay bright red
+// - offline: a small mark on downloaded / cached hikes, the rest faded, and an
+//   "Offline" chip that can narrow the list to the hikes on this device
 
 import './fonts.js';
 import './styles/base.css';
@@ -26,8 +28,10 @@ import { setupCover } from './lib/cover.js';
 import { registerServiceWorker, setupInstallButton } from './lib/pwa.js';
 import { watchForUpdates } from './lib/version.js';
 import { keepFullScreen } from './lib/full-screen.js';
+import { prepareOfflineStore, tidyUp, offlineStates, stateOf, CHANGE_EVENT } from './lib/offline-store.js';
 
 registerServiceWorker();
+navigator.serviceWorker?.ready.then(async () => { await prepareOfflineStore(); await tidyUp(); });
 watchForUpdates();
 keepFullScreen();
 setupInstallButton(document.getElementById('install'), document.getElementById('install-hint'));
@@ -67,12 +71,16 @@ const facts = (h) => [
     fact('time', fmtWalk(h.stats.walking_time_h), 'walking time'),
 ];
 
+// Downloaded: an arrow into a tray. Cached (offline only): the same, outlined.
+const SAVED_SVG = '<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2.5v7M4.8 6.6 8 9.8l3.2-3.2M3 12.8h10"/></svg>';
+const offlineMark = () => el('span', { className: 'offline-mark', innerHTML: SAVED_SVG });
+
 /** One compact row: small picture, name, one line of numbers. */
 function hikeRow(h) {
     return el('a', { href: hikeUrl(h), className: 'hike-row' },
         visual(h, 'hike-visual'),
         el('div', { className: 'hike-info' },
-            el('h2', { className: 'hike-title', textContent: h.title }),
+            el('h2', { className: 'hike-title' }, h.title, offlineMark()),
             el('p', { className: 'hike-away', hidden: true }),
             el('p', { className: 'hike-facts' }, facts(h)),
         ),
@@ -385,7 +393,8 @@ const EMPTY = {
 };
 const baseTitle = document.title;
 let allHikes = [];
-let visible = new Set(); // ids of the hikes in the current list
+let visible = new Set(); // ids of the hikes in the current list (scope, and "only on this device" when on)
+let scopeIds = new Set(); // ids in the current scope
 const shownHikes = () => allHikes.filter((h) => visible.has(h.id));
 const emptyNote = el('p', { className: 'error', hidden: true });
 list.before(emptyNote);
@@ -393,7 +402,8 @@ let scopeChip = null;
 let locate = null;
 
 async function setScope(scope, { first = false } = {}) {
-    visible = new Set((await listHikes(scope)).map((h) => h.id));
+    scopeIds = new Set((await listHikes(scope)).map((h) => h.id));
+    visible = filterOffline(scopeIds);
 
     const { heading, title } = SCOPES[scope];
     document.querySelector('.panel-head h1').textContent = heading;
@@ -462,4 +472,68 @@ listHikes('all')
         await setScope(currentScope(), { first: true });
         window.addEventListener(SCOPE_EVENT, (e) => setScope(e.detail));
     })
+    .then(setupOffline)
     .catch((err) => list.append(el('p', { className: 'error', textContent: err.message })));
+
+// ---------- offline: what's on this device ----------
+// Marks: downloaded hikes always get a small arrow; offline, cached hikes get an
+// outlined one and hikes that need internet fade. The "Offline" chip (only shown
+// offline) narrows the list and map to the hikes on this device.
+let states = { downloaded: new Set(), cached: new Set() };
+let onlySaved = false;
+const offline = () => !navigator.onLine;
+
+function filterOffline(ids) {
+    if (!onlySaved || !offline()) return ids;
+    return new Set([...ids].filter((id) => stateOf(states, id) !== 'none'));
+}
+
+const offlineChip = el('button', { type: 'button', className: 'offline-chip', hidden: true });
+offlineChip.setAttribute('aria-pressed', 'false');
+
+function renderOfflineChip() {
+    offlineChip.hidden = !offline() || !allHikes.length;
+    offlineChip.setAttribute('aria-pressed', String(onlySaved));
+    offlineChip.replaceChildren(
+        el('span', { className: 'offline-dot', ariaHidden: 'true' }),
+        el('span', { textContent: onlySaved ? 'Offline · on this device' : 'Offline' }),
+        onlySaved ? el('span', { className: 'scope-x', ariaHidden: 'true', textContent: '×' }) : null,
+    );
+    offlineChip.title = onlySaved ? 'Show all hikes' : 'Show only the hikes on this device';
+}
+
+function applyOffline() {
+    document.documentElement.classList.toggle('is-offline', offline());
+    for (const [id, row] of rowsById) {
+        const state = stateOf(states, id);
+        row.dataset.offline = state;
+        const mark = row.querySelector('.offline-mark');
+        mark.title = state === 'downloaded' ? 'Downloaded' : state === 'cached' ? 'Opened before: on this device' : '';
+        mark.setAttribute('aria-label', mark.title);
+        mark.setAttribute('role', mark.title ? 'img' : 'presentation');
+    }
+    renderOfflineChip();
+    const next = filterOffline(scopeIds);
+    if ([...next].join() !== [...visible].join()) {
+        visible = next;
+        for (const [id, row] of rowsById) row.hidden = !visible.has(id);
+        renderTotals(shownHikes());
+        overview?.setVisible(visible);
+        locate?.refresh();
+    }
+}
+
+async function refreshStates() {
+    states = await offlineStates();
+    applyOffline();
+}
+
+function setupOffline() {
+    if (!allHikes.length) return;
+    document.querySelector('.panel-head').after(offlineChip);
+    offlineChip.addEventListener('click', () => { onlySaved = !onlySaved; applyOffline(); });
+    window.addEventListener('online', applyOffline);
+    window.addEventListener('offline', applyOffline);
+    window.addEventListener(CHANGE_EVENT, refreshStates);
+    refreshStates();
+}

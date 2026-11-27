@@ -80,3 +80,11 @@
     width: 257px !important;
     height: 257px !important;
 }
+
+/* Offline stand-in for a map piece that wasn't saved (map-layers.js): saved
+   pieces of another zoom level, cropped to the piece's square. */
+.leaflet-container .leaflet-tile-pane .leaflet-tile-fallback {
+    width: 257px !important;
+    height: 257px !important;
+    overflow: hidden;
+}

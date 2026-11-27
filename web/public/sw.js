@@ -1,18 +1,27 @@
 // Hiking Book service worker: makes the book work offline.
 //
 //   pages (index.html, hike.html)   network first, saved copy when offline
-//   assets/ (JS, CSS, fonts)        saved on first use (file names change on every build)
-//   data/ (hike JSON)               saved copy shown at once, refreshed in the background
-//   photos/, backgrounds/           saved on first use
-//   icons/                          saved copy shown at once, refreshed in the background
-//   map tiles                       saved on first use, oldest dropped past MAX_TILES
+//   assets/ (JS, CSS, fonts)        saved at install (file names change on every build)
+//   data/ (hike JSON), icons/       saved copy shown at once, refreshed in the background
+//   photos/, backgrounds/           saved on first use (browsing pile, see below)
+//   map tiles                       saved on first use (browsing pile, see below)
+//
+// Two piles for photos and map tiles:
+//   downloads (hb-dl-*)   what "Save for offline" stored. Kept until the reader removes it
+//                         (src/lib/offline-store.js, src/hike/offline.js). Never trimmed here.
+//   browsing (hb-photos, hb-tiles)  whatever the reader happened to look at. Rolling:
+//                         past MAX_PHOTO_BYTES / MAX_TILES the least recently used goes first.
+// Lookup: downloads -> browsing -> network.
+//
+// Requests made with cache: 'no-store' are left alone (straight to the network):
+// the download code and version check use that to get fresh copies.
 //
 // VERSION is replaced with the build's version stamp on every `npm run build`
 // (see vite.config.js), so each deploy installs a fresh service worker:
 // new pages, and the saved hike data refreshed. The value here is only used
 // if sw.js is served without building.
 
-const VERSION = 'v4';
+const VERSION = 'v5';
 // This build's JS, CSS and fonts (assets/…), filled in on every `npm run build`
 // (see vite.config.js). Saved at install, so the book opens offline even if a
 // page was never opened online since the last update.
@@ -20,12 +29,19 @@ const BUILD_FILES = [];
 const PAGES = `hb-pages-${VERSION}`;
 const ASSETS = 'hb-assets';
 const DATA = 'hb-data';
-const PHOTOS = 'hb-photos';
-const TILES = 'hb-tiles';
-const MAX_TILES = 12000; // ≈ 300–400 MB; room for a few hikes saved at "Max detail"
+const PHOTOS = 'hb-photos';        // browsing
+const TILES = 'hb-tiles';          // browsing
+const DL_PHOTOS = 'hb-dl-photos';  // downloads
+const DL_TILES = 'hb-dl-tiles';    // downloads
+const MAX_TILES = 3000;                    // ≈ 75 MB of map you looked at
+const MAX_PHOTO_BYTES = 100 * 1024 * 1024; // photos you looked at
+const TRIM_EVERY = 25;                     // check the limits after this many new files
 
 const SCOPE = self.registration.scope; // e.g. https://you.github.io/hiking-book/
 const at = (p) => new URL(p, SCOPE).href;
+// Written by the page (offline-store.js) once downloads made before the two piles
+// existed were moved to hb-dl-*. Until then nothing is trimmed, so no download is lost.
+const MOVED_MARK = at('__hb-downloads-moved');
 // Must be saved at install (or the install fails and the previous version keeps working)
 const PAGE_FILES = ['', 'index.html', 'hike.html'].map(at);
 // Nice to have
@@ -80,17 +96,21 @@ self.addEventListener('activate', (event) => {
             const assets = await caches.open(ASSETS);
             for (const request of await assets.keys()) if (!keep.has(request.url)) await assets.delete(request);
         }
+        // Icons used to live with the photos; they're in hb-data now
+        const photos = await caches.open(PHOTOS);
+        for (const request of await photos.keys()) if (request.url.startsWith(at('icons/'))) await photos.delete(request);
         await self.clients.claim();
+        await trim();
     })());
 });
 
 self.addEventListener('fetch', (event) => {
     const request = event.request;
-    if (request.method !== 'GET') return;
+    if (request.method !== 'GET' || request.cache === 'no-store') return;
     const url = new URL(request.url);
 
     if (TILE_HOSTS.test(url.hostname)) {
-        event.respondWith(tile(request));
+        event.respondWith(tile(request, event));
         return;
     }
     if (!request.url.startsWith(SCOPE)) return; // other sites: leave alone
@@ -104,9 +124,9 @@ self.addEventListener('fetch', (event) => {
         event.respondWith(staleWhileRevalidate(request, DATA, event));
     } else if (path.startsWith('icons/')) {
         // small, and may be recolored (tools/make_icons.py): saved copy at once, refreshed in the background
-        event.respondWith(staleWhileRevalidate(request, PHOTOS, event));
+        event.respondWith(staleWhileRevalidate(request, DATA, event));
     } else if (/^(photos|backgrounds)\//.test(path)) {
-        event.respondWith(cacheFirst(request, PHOTOS));
+        event.respondWith(photo(request, event));
     }
 });
 
@@ -149,31 +169,108 @@ async function staleWhileRevalidate(request, cacheName, event) {
     return (await refresh) ?? Response.error();
 }
 
-async function tile(request) {
-    const cache = await caches.open(TILES);
+// ---------- photos and map tiles: downloads -> browsing -> network ----------
+
+// Using a browsing copy moves it to the back of the queue (re-saving it does that),
+// once per service-worker run so a map full of pieces doesn't rewrite them all the time.
+const touched = new Set();
+function touch(cache, key, hit, event) {
+    if (touched.has(key)) return;
+    touched.add(key);
+    event.waitUntil(cache.put(key, hit.clone()).catch(() => {}));
+}
+
+let newFiles = 0;
+/** Keep a file in the browsing pile. A full phone: just don't keep it. */
+function keep(cache, key, response, event) {
+    event.waitUntil((async () => {
+        try { await cache.put(key, response); } catch { return; }
+        if (++newFiles % TRIM_EVERY === 0) await trim();
+    })());
+}
+
+async function photo(request, event) {
+    const key = request.url.split('?')[0];
+    const dl = await (await caches.open(DL_PHOTOS)).match(key);
+    if (dl) return dl;
+    const browse = await caches.open(PHOTOS);
+    const hit = await browse.match(key);
+    if (hit) { touch(browse, key, hit, event); return hit; }
+    const response = await fetch(request);
+    if (response.ok) keep(browse, key, response.clone(), event);
+    return response;
+}
+
+// Map servers that answer "cors" requests: then the saved piece is a normal file the
+// browser can measure. Others only give opaque answers (size hidden, and Chrome counts
+// each one as much bigger than it is against the storage limit). Learned per server.
+const corsHosts = new Map(); // hostname -> true | false
+
+/** A map piece from the network: as a cors request where the server allows it. */
+async function fetchTile(request) {
+    const host = new URL(request.url).hostname;
+    if (corsHosts.get(host) !== false) {
+        try {
+            const response = await fetch(new Request(request.url, { mode: 'cors', credentials: 'omit' }));
+            corsHosts.set(host, true);
+            return response;
+        } catch { /* no cors on this server, or offline: try the plain way */ }
+    }
+    const response = await fetch(request);
+    if (response.type === 'opaque') corsHosts.set(host, false);
+    return response;
+}
+
+async function tile(request, event) {
     const key = tileKey(request.url);
-    const hit = await cache.match(key);
-    if (hit) return hit;
+    const dl = await (await caches.open(DL_TILES)).match(key);
+    if (dl) return dl;
+    const browse = await caches.open(TILES);
+    const hit = await browse.match(key);
+    if (hit) { touch(browse, key, hit, event); return hit; }
     try {
-        const response = await fetch(request);
-        if (response.ok || response.type === 'opaque') {
-            await cache.put(key, response.clone());
-            trimTiles(cache);
-        }
+        const response = await fetchTile(request);
+        if (response.ok || response.type === 'opaque') keep(browse, key, response.clone(), event);
         return response;
     } catch {
         return Response.error();
     }
 }
 
+/** Size of a saved file (the browser hides it for opaque map pieces: estimate). */
+async function bytesOf(cache, request) {
+    const hit = await cache.match(request);
+    if (!hit) return 0;
+    const length = Number(hit.headers.get('content-length'));
+    if (length > 0) return length;
+    if (hit.type === 'opaque') return 30 * 1024;
+    return (await hit.blob()).size;
+}
+
 let trimming = false;
-async function trimTiles(cache) {
+/** Browsing piles over their limit: drop the least recently used (keys() lists oldest first). */
+async function trim() {
     if (trimming) return;
     trimming = true;
     try {
-        const keys = await cache.keys();
-        const extra = keys.length - MAX_TILES;
-        for (let i = 0; i < extra; i++) await cache.delete(keys[i]); // oldest first
+        if (!(await (await caches.open(DL_TILES)).match(MOVED_MARK))) return; // old downloads not moved yet
+        const tiles = await caches.open(TILES);
+        const tileKeys = await tiles.keys();
+        for (let i = 0; i < tileKeys.length - MAX_TILES; i++) await tiles.delete(tileKeys[i]);
+
+        const photos = await caches.open(PHOTOS);
+        const photoKeys = await photos.keys();
+        const sizes = [];
+        let total = 0;
+        for (const request of photoKeys) {
+            const bytes = await bytesOf(photos, request);
+            sizes.push(bytes);
+            total += bytes;
+        }
+        for (let i = 0; i < photoKeys.length && total > MAX_PHOTO_BYTES; i++) {
+            await photos.delete(photoKeys[i]);
+            total -= sizes[i];
+        }
     } finally {
         trimming = false;
     }

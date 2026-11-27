@@ -3,7 +3,7 @@ import './styles/base.css';
 import './styles/hike.css';
 import './styles/gallery.css';
 
-import { getHike, asset, el } from './lib/data.js';
+import { getHike, asset, el, NotFound } from './lib/data.js';
 import { setupProfileMenu } from './lib/profile-menu.js';
 import { fmtDist, fmtElev, fmtDuration, fmtWalk } from './lib/units.js';
 import { onPaceChange, paceSlider } from './lib/pace.js';
@@ -20,8 +20,10 @@ import { setupLocate } from './hike/locate.js';
 import { setupOfflineSave } from './hike/offline.js';
 import { watchForUpdates } from './lib/version.js';
 import { keepFullScreen } from './lib/full-screen.js';
+import { prepareOfflineStore } from './lib/offline-store.js';
 
 registerServiceWorker();
+navigator.serviceWorker?.ready.then(prepareOfflineStore);
 watchForUpdates();
 keepFullScreen();
 
@@ -115,7 +117,11 @@ if (!id) {
             renderGallery(hike.photos);
         })
         .catch((err) => {
-            document.getElementById('title').textContent = 'Hike not found';
-            document.getElementById('subtitle').textContent = err.message;
+            // No signal and this hike was never opened on this device: its data isn't here
+            const notHere = !(err instanceof NotFound) && (!navigator.onLine || err instanceof TypeError);
+            document.getElementById('title').textContent = notHere ? 'Not available offline' : 'Hike not found';
+            document.getElementById('subtitle').textContent = notHere
+                ? 'This hike isn’t on this device yet.'
+                : err.message;
         });
 }

@@ -31,11 +31,91 @@ export function tileUrl(layer, z, x, y) {
         .replace('{z}', z).replace('{x}', x).replace('{y}', y);
 }
 
+// ---------- missing map pieces (offline): blurry instead of blank ----------
+// Offline, a map piece that was never saved fails to load. Leaflet then drops
+// the zoom level you were looking at, so the map goes blank. Instead we look in
+// the saved map pieces for the same spot at another zoom level:
+//   - the 4 more detailed pieces one level down (zooming out), shrunk
+//   - a less detailed piece up to MAX_UP levels up (zooming in), cropped and enlarged
+//   - whatever more detailed pieces exist 1–2 levels down (only part of the spot)
+// and draw those in its place. Online nothing changes (pieces load normally).
+
+const MAX_UP = 4;
+const SIZE = 256; // every map in config.js has 256 px pieces
+
+const tileKey = (url) => url.replace(/^https:\/\/[abc]\.tile\./, 'https://a.tile.');
+
+async function isSaved(url) {
+    if (!('caches' in window)) return false;
+    try { return !!(await caches.match(tileKey(url))); } catch { return false; }
+}
+
+/** The saved pieces to draw instead of piece z/x/y: [{ url, x, y, size }] in px inside the 256 px piece, or [] if none. */
+async function findStandIns(layer, { x, y, z }) {
+    const kids = async (d) => {
+        const n = 2 ** d;
+        const size = SIZE / n;
+        const found = [];
+        await Promise.all(Array.from({ length: n * n }, async (_, i) => {
+            const dx = i % n;
+            const dy = Math.floor(i / n);
+            const url = tileUrl(layer, z + d, x * n + dx, y * n + dy);
+            if (await isSaved(url)) found.push({ url, x: dx * size, y: dy * size, size });
+        }));
+        return found;
+    };
+    const canGoDown = (d) => z + d <= layer.maxZoom;
+
+    const one = canGoDown(1) ? await kids(1) : [];
+    if (one.length === 4) return one;
+    for (let d = 1; d <= MAX_UP && z - d >= 0; d++) {
+        const n = 2 ** d;
+        const url = tileUrl(layer, z - d, Math.floor(x / n), Math.floor(y / n));
+        if (await isSaved(url)) {
+            const size = SIZE * n;
+            return [{ url, x: -(x % n) * SIZE, y: -(y % n) * SIZE, size }];
+        }
+    }
+    if (one.length) return one;
+    return canGoDown(2) ? kids(2) : [];
+}
+
+/** A tile layer that, when a piece fails, shows saved pieces of other zoom levels in its place. */
+const FallbackTileLayer = L.TileLayer.extend({
+    createTile(coords, done) {
+        const img = L.TileLayer.prototype.createTile.call(this, coords, () => {});
+        const key = this._tileCoordsToKey(coords);
+        const layer = this.options.hbLayer;
+        img.onload = () => done(null, img);
+        img.onerror = async (e) => {
+            const standIns = layer ? await findStandIns(layer, coords) : [];
+            const entry = this._tiles[key];
+            if (!standIns.length || !entry || entry.el !== img) { done(e, img); return; }
+            const box = document.createElement('div');
+            box.style.cssText = img.style.cssText;
+            box.className = `${img.className} leaflet-tile-fallback`;
+            box.complete = true; // Leaflet drops "still loading" pieces when you zoom; this one is done
+            for (const s of standIns) {
+                const part = document.createElement('img');
+                part.alt = '';
+                part.src = s.url;
+                part.style.cssText = `position:absolute;left:${s.x}px;top:${s.y}px;width:${s.size + 1}px;height:${s.size + 1}px;max-width:none`;
+                box.append(part);
+            }
+            img.replaceWith(box);
+            entry.el = box;
+            done(null, box);
+        };
+        return img;
+    },
+});
+
 /** Adds the selected map plus a layer button to switch; applies the map's tint (look). */
 export function addMapLayers(map) {
     const container = map.getContainer();
     map.attributionControl?.setPrefix(false); // no "Leaflet" + flag in front of the map credits
-    const tileLayers = new Map(LAYERS.map((layer) => [layer, L.tileLayer(layer.url, {
+    const tileLayers = new Map(LAYERS.map((layer) => [layer, new FallbackTileLayer(layer.url, {
+        hbLayer: layer,
         maxZoom: layer.maxZoom,
         subdomains: layer.subdomains ?? 'abc',
         attribution: layer.attribution,
