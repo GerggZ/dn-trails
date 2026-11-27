@@ -460,7 +460,6 @@
     color: var(--ink-soft);
 }
 .hike-row[data-offline='downloaded'] .offline-mark { display: inline-block; }
-.is-offline .hike-row[data-offline='cached'] .offline-mark { display: inline-block; opacity: 0.55; }
 .is-offline .panel .hike-row[data-offline='none'] { opacity: 0.45; }
 
 .offline-chip {

@@ -45,9 +45,13 @@ const MOVED_MARK = at('__hb-downloads-moved');
 // Must be saved at install (or the install fails and the previous version keeps working)
 const PAGE_FILES = ['', 'index.html', 'hike.html'].map(at);
 // Nice to have
-const CORE = ['manifest.webmanifest', 'data/index.json', 'data/users.json', 'data/backgrounds.json', 'data/cover.json'].map(at);
+const CORE = ['manifest.webmanifest', 'icons/dn-logo.svg', 'data/index.json', 'data/users.json', 'data/backgrounds.json', 'data/cover.json'].map(at);
 // Online but no answer within this time (weak signal in the mountains): use the saved page
 const PAGE_TIMEOUT_MS = 3000;
+// Saved copies are looked up ignoring the server's Vary header: some hosts answer with
+// "Vary: Origin", and a module script asks with an Origin header while the copy saved at
+// install didn't, so the browser would think they differ and miss the saved copy offline.
+const MATCH = { ignoreVary: true };
 
 // Map pictures for every map in config.js mapLayers (OpenTopoMap, OpenStreetMap, Esri)
 const TILE_HOSTS = /(^|\.)tile\.opentopomap\.org$|(^|\.)tile\.openstreetmap\.org$|(^|\.)arcgisonline\.com$/;
@@ -141,15 +145,15 @@ async function page(request) {
         return await Promise.race([network, new Promise((_, reject) => setTimeout(reject, PAGE_TIMEOUT_MS))]);
     } catch {
         // Offline, or no answer in time. hike.html?id=x -> the saved hike.html (the page reads the id itself)
-        const saved = (await cache.match(request, { ignoreSearch: true }))
-            ?? (await cache.match(at('index.html')));
+        const saved = (await cache.match(request, { ignoreSearch: true, ignoreVary: true }))
+            ?? (await cache.match(at('index.html'), MATCH));
         return saved ?? network.catch(() => Response.error()); // nothing saved: keep waiting for the network
     }
 }
 
 async function cacheFirst(request, cacheName) {
     const cache = await caches.open(cacheName);
-    const hit = await cache.match(request);
+    const hit = await cache.match(request, MATCH);
     if (hit) return hit;
     const response = await fetch(request);
     if (response.ok) cache.put(request, response.clone());
@@ -158,7 +162,8 @@ async function cacheFirst(request, cacheName) {
 
 async function staleWhileRevalidate(request, cacheName, event) {
     const cache = await caches.open(cacheName);
-    const hit = await cache.match(request);
+    // (the site logo is also saved at install, with the pages)
+    const hit = (await cache.match(request, MATCH)) ?? (await caches.match(request, MATCH));
     const refresh = fetch(request)
         .then((response) => { if (response.ok) cache.put(request, response.clone()); return response; })
         .catch(() => null);
@@ -191,10 +196,10 @@ function keep(cache, key, response, event) {
 
 async function photo(request, event) {
     const key = request.url.split('?')[0];
-    const dl = await (await caches.open(DL_PHOTOS)).match(key);
+    const dl = await (await caches.open(DL_PHOTOS)).match(key, MATCH);
     if (dl) return dl;
     const browse = await caches.open(PHOTOS);
-    const hit = await browse.match(key);
+    const hit = await browse.match(key, MATCH);
     if (hit) { touch(browse, key, hit, event); return hit; }
     const response = await fetch(request);
     if (response.ok) keep(browse, key, response.clone(), event);
@@ -203,30 +208,35 @@ async function photo(request, event) {
 
 // Map servers that answer "cors" requests: then the saved piece is a normal file the
 // browser can measure. Others only give opaque answers (size hidden, and Chrome counts
-// each one as much bigger than it is against the storage limit). Learned per server.
-const corsHosts = new Map(); // hostname -> true | false
+// each one as ~7 MB against the storage limit). Learned per server: once one cors
+// request worked it stays cors-friendly (a later failure only falls back for that piece);
+// "no cors" only after the first few tries all failed while the plain way worked.
+const corsHosts = new Map(); // hostname -> true | number of failed cors tries
+const NO_CORS_AFTER = 3;
 
 /** A map piece from the network: as a cors request where the server allows it. */
 async function fetchTile(request) {
     const host = new URL(request.url).hostname;
-    if (corsHosts.get(host) !== false) {
+    const known = corsHosts.get(host);
+    if (known === true || (known ?? 0) < NO_CORS_AFTER) {
         try {
             const response = await fetch(new Request(request.url, { mode: 'cors', credentials: 'omit' }));
             corsHosts.set(host, true);
             return response;
-        } catch { /* no cors on this server, or offline: try the plain way */ }
+        } catch { /* no cors on this server, a hiccup, or offline: try the plain way */ }
+        const response = await fetch(request);
+        if (response.type === 'opaque' && corsHosts.get(host) !== true) corsHosts.set(host, (corsHosts.get(host) ?? 0) + 1);
+        return response;
     }
-    const response = await fetch(request);
-    if (response.type === 'opaque') corsHosts.set(host, false);
-    return response;
+    return fetch(request);
 }
 
 async function tile(request, event) {
     const key = tileKey(request.url);
-    const dl = await (await caches.open(DL_TILES)).match(key);
+    const dl = await (await caches.open(DL_TILES)).match(key, MATCH);
     if (dl) return dl;
     const browse = await caches.open(TILES);
-    const hit = await browse.match(key);
+    const hit = await browse.match(key, MATCH);
     if (hit) { touch(browse, key, hit, event); return hit; }
     try {
         const response = await fetchTile(request);
@@ -239,7 +249,7 @@ async function tile(request, event) {
 
 /** Size of a saved file (the browser hides it for opaque map pieces: estimate). */
 async function bytesOf(cache, request) {
-    const hit = await cache.match(request);
+    const hit = await cache.match(request, MATCH);
     if (!hit) return 0;
     const length = Number(hit.headers.get('content-length'));
     if (length > 0) return length;
@@ -253,7 +263,7 @@ async function trim() {
     if (trimming) return;
     trimming = true;
     try {
-        if (!(await (await caches.open(DL_TILES)).match(MOVED_MARK))) return; // old downloads not moved yet
+        if (!(await (await caches.open(DL_TILES)).match(MOVED_MARK, MATCH))) return; // old downloads not moved yet
         const tiles = await caches.open(TILES);
         const tileKeys = await tiles.keys();
         for (let i = 0; i < tileKeys.length - MAX_TILES; i++) await tiles.delete(tileKeys[i]);

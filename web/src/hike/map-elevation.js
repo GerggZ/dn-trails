@@ -1210,7 +1210,6 @@ export function renderMapAndElevation(hike) {
         // Left full screen by the phone's back gesture (no popstate then): that
         // closes the map too, whether the map or the page asked for full screen
         if (screenFull || full) { screenFull = false; closeFull(); }
-        else if (full) { map.invalidateSize(); updateCover(); }
     });
 
     function openFull() {

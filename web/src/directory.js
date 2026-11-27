@@ -25,11 +25,13 @@ import { setupOverviewLocate } from './lib/overview-locate.js';
 import { APP_CONFIG } from './config.js';
 import { BOOK_NAME } from './lib/edition.js';
 import { setupCover } from './lib/cover.js';
+import { setupErrorReports } from './lib/errors.js';
 import { registerServiceWorker, setupInstallButton } from './lib/pwa.js';
 import { watchForUpdates } from './lib/version.js';
 import { keepFullScreen } from './lib/full-screen.js';
 import { prepareOfflineStore, tidyUp, offlineStates, stateOf, CHANGE_EVENT } from './lib/offline-store.js';
 
+setupErrorReports();
 registerServiceWorker();
 navigator.serviceWorker?.ready.then(async () => { await prepareOfflineStore(); await tidyUp(); });
 watchForUpdates();
@@ -71,7 +73,7 @@ const facts = (h) => [
     fact('time', fmtWalk(h.stats.walking_time_h), 'walking time'),
 ];
 
-// Downloaded: an arrow into a tray. Cached (offline only): the same, outlined.
+// Downloaded: an arrow into a tray (cached hikes get no mark).
 const SAVED_SVG = '<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2.5v7M4.8 6.6 8 9.8l3.2-3.2M3 12.8h10"/></svg>';
 const offlineMark = () => el('span', { className: 'offline-mark', innerHTML: SAVED_SVG });
 
@@ -476,8 +478,8 @@ listHikes('all')
     .catch((err) => list.append(el('p', { className: 'error', textContent: err.message })));
 
 // ---------- offline: what's on this device ----------
-// Marks: downloaded hikes always get a small arrow; offline, cached hikes get an
-// outlined one and hikes that need internet fade. The "Offline" chip (only shown
+// Marks: downloaded hikes always get a small arrow; offline, hikes that need
+// internet fade. Cached hikes (opened before) look normal: no mark, not faded. The "Offline" chip (only shown
 // offline) narrows the list and map to the hikes on this device.
 let states = { downloaded: new Set(), cached: new Set() };
 let onlySaved = false;
@@ -508,7 +510,7 @@ function applyOffline() {
         const state = stateOf(states, id);
         row.dataset.offline = state;
         const mark = row.querySelector('.offline-mark');
-        mark.title = state === 'downloaded' ? 'Downloaded' : state === 'cached' ? 'Opened before: on this device' : '';
+        mark.title = state === 'downloaded' ? 'Downloaded' : '';
         mark.setAttribute('aria-label', mark.title);
         mark.setAttribute('role', mark.title ? 'img' : 'presentation');
     }

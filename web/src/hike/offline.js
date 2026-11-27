@@ -21,24 +21,31 @@ import {
 
 class OutOfSpace extends Error {}
 
-// Map servers that answer "cors" requests (then the saved piece has a real, visible size).
-// Learned while downloading: hostname -> true | false.
-const corsHosts = new Map();
+// Map servers that answer "cors" requests (then the saved piece has a real, visible size;
+// opaque pieces are counted by Chrome as ~7 MB each against the storage limit).
+// Learned while downloading: once a server answered one cors request it counts as
+// cors-friendly, and a later failed cors request is only retried the plain way for that
+// one piece. A server counts as "no cors" only after its first few cors tries all failed.
+const corsHosts = new Map(); // hostname -> true | number of failed cors tries so far
+const NO_CORS_AFTER = 3;
 
 /** One map piece, straight from the network (cache: 'no-store' = past the service worker). */
 async function fetchTile(url) {
     const host = new URL(url).hostname;
-    if (corsHosts.get(host) !== false) {
+    const known = corsHosts.get(host);
+    if (known === true || (known ?? 0) < NO_CORS_AFTER) {
         try {
             const response = await fetch(url, { mode: 'cors', credentials: 'omit', cache: 'no-store' });
             corsHosts.set(host, true);
             return response;
-        } catch { /* this server doesn't allow it (or no signal): the plain way */ }
+        } catch { /* this server doesn't allow it (or a hiccup): the plain way, for this piece */ }
+        if (corsHosts.get(host) !== true) corsHosts.set(host, (corsHosts.get(host) ?? 0) + 1);
     }
-    const response = await fetch(url, { mode: 'no-cors', cache: 'no-store' });
-    corsHosts.set(host, false);
-    return response;
+    return fetch(url, { mode: 'no-cors', cache: 'no-store' });
 }
+
+/** Saved piece that Chrome can't measure (opaque), from a server that does allow cors: worth fetching again. */
+const upgradable = (hit, url) => hit?.type === 'opaque' && corsHosts.get(new URL(url).hostname) !== NO_CORS_AFTER;
 
 const fmtMB = (tiles) => {
     const mb = (tiles * (TILE_KB[offlineLayer().id] ?? 30)) / 1024;
@@ -145,11 +152,15 @@ export function setupOfflineSave(hike, button, statusEl) {
             let fetched = 0;
             let failed = 0;
             await runLimited(urls, PARALLEL, async (url) => {
-                if (!(await tiles.match(url)) && !(await moveToDownloads(browseTiles, tiles, url))) {
+                let have = await tiles.match(url);
+                if (!have && await moveToDownloads(browseTiles, tiles, url)) have = await tiles.match(url);
+                // "Update offline copy" also swaps opaque pieces for measurable ones where the server allows it
+                if (!have || upgradable(have, url)) {
                     let response = null;
                     try { response = await fetchTile(url); } catch { /* counted below */ }
-                    if (response && (response.ok || response.type === 'opaque')) await store(tiles, url, response);
-                    else failed++;
+                    if (response && (response.ok || (!have && response.type === 'opaque'))) {
+                        if (!(have && response.type === 'opaque')) await store(tiles, url, response);
+                    } else if (!have) failed++;
                 }
                 fetched++;
                 if (fetched % 10 === 0 || fetched === urls.length) say(`Saving map… ${fetched} / ${urls.length}`);

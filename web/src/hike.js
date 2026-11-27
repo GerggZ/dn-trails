@@ -11,8 +11,8 @@ import { hasTimes, totalHours } from './lib/walking-time.js';
 import { cutOut, resample } from './lib/silhouette.js';
 import { scenery } from './lib/scenery.js';
 import { renderBackdrop } from './lib/backdrop.js';
-import { APP_CONFIG } from './config.js';
 import { BOOK_NAME } from './lib/edition.js';
+import { setupErrorReports } from './lib/errors.js';
 import { registerServiceWorker } from './lib/pwa.js';
 import { renderMapAndElevation } from './hike/map-elevation.js';
 import { renderGallery } from './hike/gallery.js';
@@ -22,6 +22,7 @@ import { watchForUpdates } from './lib/version.js';
 import { keepFullScreen } from './lib/full-screen.js';
 import { prepareOfflineStore } from './lib/offline-store.js';
 
+setupErrorReports();
 registerServiceWorker();
 navigator.serviceWorker?.ready.then(prepareOfflineStore);
 watchForUpdates();
