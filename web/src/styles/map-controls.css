@@ -54,6 +54,14 @@
 .leaflet-control button { -webkit-tap-highlight-color: transparent; }
 .leaflet-control a:focus:not(:focus-visible),
 .leaflet-control button:focus:not(:focus-visible) { outline: none; }
+/* Trails and other clickable map shapes: Chrome puts a black focus box around a
+   clicked SVG path (a known Leaflet 1.9 quirk). Never show it; picking a trail
+   is already shown by fading the others. Also the map itself when tapped. */
+.leaflet-container path.leaflet-interactive,
+.leaflet-container .leaflet-interactive { -webkit-tap-highlight-color: transparent; }
+.leaflet-container .leaflet-interactive:focus,
+.leaflet-container svg:focus,
+.leaflet-container:focus:not(:focus-visible) { outline: none; }
 /* Leaflet greys a focused button; only do that for keyboard focus */
 .leaflet-bar a:focus:not(:focus-visible):not(:hover) { background-color: transparent; }
 

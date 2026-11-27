@@ -37,10 +37,13 @@
 }
 
 /* --- Stats: signpost numbers --- */
+/* Wide screens: each number as wide as it needs, the same space between them,
+   first at the left edge and last at the right */
 .stats {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
-    gap: 16px clamp(16px, 3vw, 32px);
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 16px clamp(24px, 4vw, 48px);
     margin: 32px 0 0;
     padding: 18px 0;
     border-top: 2px solid var(--ink);
@@ -71,7 +74,7 @@
 .stats:has(+ .pace) { border-bottom: none; padding-bottom: 8px; }
 
 @media (max-width: 640px) {
-    .stats { grid-template-columns: repeat(2, 1fr); }
+    .stats { display: grid; grid-template-columns: repeat(2, 1fr); }
     .stat dd { font-size: var(--step-2); }
 }
 

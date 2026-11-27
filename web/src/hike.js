@@ -56,7 +56,6 @@ function renderHeader(hike) {
         ['climb and descent', `↑${fmtElev(s.ascent_m).replace(/\s*\S+$/, '')} ↓${fmtElev(s.descent_m)}`],
         ['highest point', fmtElev(s.max_elevation_m), null, 'peak'],
         timeStat,
-        ['difficulty', hike.difficulty],
     ].filter(([, value]) => value);
 
     const peakIcon = () => {
@@ -89,9 +88,14 @@ function renderHeader(hike) {
         hike.description.split(/\n\s*\n/).filter(Boolean)
             .forEach((p) => box.append(el('p', { textContent: p })));
         if (hike.companions.length) {
-            box.append(el('p', { className: 'companions', textContent: `With ${hike.companions.join(', ')}.` }));
+            box.append(el('p', { className: 'companions', textContent: `With ${andList(hike.companions)}.` }));
         }
     }
+}
+
+/** "Danna", "Danna and Neil", "Danna, Neil and Gregg" */
+function andList(names) {
+    return names.length < 2 ? names.join('') : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`;
 }
 
 const id = new URLSearchParams(window.location.search).get('id');

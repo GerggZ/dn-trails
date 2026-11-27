@@ -1027,6 +1027,7 @@ export function renderMapAndElevation(hike) {
     const TOUCH_REACH = 28; // px around the line that count as "on the trail"
     const MOUSE_REACH = 40; // same for the mouse pointer
     let following = null; // pointerId of the finger following the trail
+    const touchesDown = new Set(); // every finger on the map right now (a 2nd one = pinch, never follow)
 
     const nearestOnScreen = (clientX, clientY) => {
         const r = mapBox.getBoundingClientRect();
@@ -1051,7 +1052,15 @@ export function renderMapAndElevation(hike) {
 
     // Capture phase, so we decide before Leaflet starts dragging the map
     mapBox.addEventListener('pointerdown', (event) => {
-        if (event.pointerType !== 'touch' || following != null || peek()) return;
+        if (event.pointerType !== 'touch') return;
+        touchesDown.add(event.pointerId);
+        if (touchesDown.size > 1) {
+            // A second finger: this is a pinch. Hand the gesture back to Leaflet
+            // (don't stop this event) so it zooms, even if a finger is on the trail.
+            if (following != null) { stopFollowing(); syncHover(null); }
+            return;
+        }
+        if (following != null || peek()) return;
         if (event.target.closest('.leaflet-control')) return; // buttons keep working
         const { px } = nearestOnScreen(event.clientX, event.clientY);
         if (px > TOUCH_REACH) {
@@ -1069,7 +1078,10 @@ export function renderMapAndElevation(hike) {
         follow(event);
     }, true);
     for (const type of ['pointerup', 'pointercancel']) {
-        mapBox.addEventListener(type, (event) => { if (event.pointerId === following) stopFollowing(); }, true);
+        mapBox.addEventListener(type, (event) => {
+            touchesDown.delete(event.pointerId);
+            if (event.pointerId === following) stopFollowing();
+        }, true);
     }
     // Some phones also send touch events; keep them from panning while following the trail
     for (const type of ['touchstart', 'touchmove']) {
