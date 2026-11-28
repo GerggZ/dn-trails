@@ -62,3 +62,23 @@ def walking_time_s(dist_km: np.ndarray, grade_pct: np.ndarray, ground: list[str]
     seg_km = np.diff(dist_km)
     hours = seg_km / speed_kmh(segment_slopes_deg(grade_pct), np.array(ground[:-1]))
     return np.concatenate([[0.0], np.cumsum(hours) * 3600])
+
+
+def time_by_slope(time_s: np.ndarray, slope_deg: np.ndarray, ground: list[str]) -> list[list]:
+    """The model's walking time summed per ground type and whole degree of slope:
+    [[mean slope (deg), ground, seconds], ...].
+
+    The main page has no full tracks, but with this it works out each hike's time
+    at the reader's pace the same way the hike page does (web/src/lib/walking-time.js).
+    time_s: cumulative seconds per point (as stored); slope_deg / ground: per stretch.
+    """
+    seconds = np.diff(time_s)
+    bins: dict[tuple[str, int], list[float]] = {}
+    for s, slope, g in zip(seconds, slope_deg, ground):
+        total = bins.setdefault((g, int(round(slope))), [0.0, 0.0])
+        total[0] += s
+        total[1] += s * slope
+    return [
+        [round(float(weighted / secs), 1) if secs else float(deg), g, int(round(secs))]
+        for (g, deg), (secs, weighted) in sorted(bins.items())
+    ]

@@ -53,12 +53,14 @@ function groundPerStretch(runs, n) {
     return out;
 }
 
+const strengthTable = () => [...cfg().strength].sort((a, b) => a[0] - b[0]);
+
 // Per hike: how strongly the pace acts on each stretch (doesn't depend on the pace)
 const strengths = new WeakMap();
 function strengthsFor(hike) {
     if (!strengths.has(hike)) {
-        const { strength, groundStrength } = cfg();
-        const table = [...strength].sort((a, b) => a[0] - b[0]);
+        const { groundStrength } = cfg();
+        const table = strengthTable();
         const n = hike.track.time_s.length - 1; // stretches between points
         const slope = hike.track.slope_deg;     // missing in older data → full strength
         const ground = groundPerStretch(hike.track.ground, n);
@@ -101,3 +103,20 @@ export const hoursToEnd = (hike, index) => hoursBetween(hike, index, hike.track.
 
 /** The whole hike. */
 export const totalHours = (hike) => hoursToEnd(hike, 0);
+
+/**
+ * A hike's walking time at the reader's pace from its card on the main page
+ * (index.json): the same sum as the hike page, from the model's time per slope
+ * and ground (time_by_slope, made by tools/hikebook/timing.py) instead of the full track.
+ */
+export function cardHours(card) {
+    const { calibration, groundStrength } = cfg();
+    const pace = getPace() / 100;
+    if (!card.time_by_slope) return card.stats.walking_time_h / (calibration * pace); // data built before 2026-11-28
+    const table = strengthTable();
+    let hours = 0;
+    for (const [slope, ground, seconds] of card.time_by_slope) {
+        hours += seconds / 3600 / (calibration * pace ** (strengthAt(slope, table) + (groundStrength[ground] ?? 0)));
+    }
+    return hours;
+}

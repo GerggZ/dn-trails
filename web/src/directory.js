@@ -12,16 +12,17 @@ import './fonts.js';
 import './styles/base.css';
 import './styles/directory.css';
 
-import { listHikes, SCOPES, asset, el } from './lib/data.js';
+import { listHikes, SCOPES, el } from './lib/data.js';
 import { setupProfileMenu, currentScope, switchScope, SCOPE_EVENT } from './lib/profile-menu.js';
-import { fmtDist, fmtElev, fmtWalk } from './lib/units.js';
-import { cutOut } from './lib/silhouette.js';
 import { renderBackdrop } from './lib/backdrop.js';
-import { scenery } from './lib/scenery.js';
-import { fact, icon } from './lib/icons.js';
-import { overviewMap } from './lib/overview-map.js';
-import { findPlace, distanceToHike } from './lib/place-search.js';
-import { setupOverviewLocate } from './lib/overview-locate.js';
+import { overviewMap } from './directory/overview-map.js';
+import { distanceToHike } from './directory/place-search.js';
+import { setupOverviewLocate } from './directory/overview-locate.js';
+import { renderTotals, hikeRow, updateWalkTimes } from './directory/hike-rows.js';
+import { onPaceChange } from './lib/pace.js';
+import { createSheet } from './directory/sheet.js';
+import { createPickCards } from './directory/pick-cards.js';
+import { setupPlaceFinder } from './directory/place-finder.js';
 import { APP_CONFIG } from './config.js';
 import { BOOK_NAME } from './lib/edition.js';
 import { setupCover } from './lib/cover.js';
@@ -29,7 +30,7 @@ import { setupErrorReports } from './lib/errors.js';
 import { registerServiceWorker, setupInstallButton } from './lib/pwa.js';
 import { watchForUpdates } from './lib/version.js';
 import { keepFullScreen } from './lib/full-screen.js';
-import { prepareOfflineStore, tidyUp, offlineStates, stateOf, CHANGE_EVENT } from './lib/offline-store.js';
+import { prepareOfflineStore, tidyUp, offlineStates, stateOf, CHANGE_EVENT } from './offline/offline-store.js';
 
 setupErrorReports();
 registerServiceWorker();
@@ -48,121 +49,18 @@ const panel = document.getElementById('panel');
 const explore = document.querySelector('.explore');
 const strip = document.getElementById('pick-strip');
 const track = document.getElementById('pick-track');
-const hikeUrl = (h) => `./hike.html?id=${encodeURIComponent(h.id)}`;
 const phone = window.matchMedia('(max-width: 899px)');
 
-function renderTotals(hikes) {
-    const km = hikes.reduce((sum, h) => sum + h.stats.distance_km, 0);
-    const up = hikes.reduce((sum, h) => sum + h.stats.ascent_m, 0);
-    document.getElementById('totals').textContent =
-        `${hikes.length} hike${hikes.length === 1 ? '' : 's'} · ${fmtDist(km, 0)} · ${fmtElev(up)} up`;
-}
-
-/** The picture (or generated landscape) with the profile cut out of its bottom. */
-function visual(h, className) {
-    const art = el('div', { className: 'card-art' });
-    art.append(h.cover ? el('img', { src: asset(h.cover), alt: '', loading: 'lazy' }) : scenery(h.profile, h.id));
-    const ridge = cutOut(art, h.profile, { band: 0.55, relief: 0.85 });
-    return el('div', { className }, art, ridge);
-}
-
-const facts = (h) => [
-    fact('distance', fmtDist(h.stats.distance_km), 'distance'),
-    fact('up', fmtElev(h.stats.ascent_m), 'up'),
-    fact('down', fmtElev(h.stats.descent_m), 'down'),
-    fact('time', fmtWalk(h.stats.walking_time_h), 'walking time'),
-];
-
-// Downloaded: an arrow into a tray (cached hikes get no mark).
-const SAVED_SVG = '<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2.5v7M4.8 6.6 8 9.8l3.2-3.2M3 12.8h10"/></svg>';
-const offlineMark = () => el('span', { className: 'offline-mark', innerHTML: SAVED_SVG });
-
-/** One compact row: small picture, name, one line of numbers. */
-function hikeRow(h) {
-    return el('a', { href: hikeUrl(h), className: 'hike-row' },
-        visual(h, 'hike-visual'),
-        el('div', { className: 'hike-info' },
-            el('h2', { className: 'hike-title' }, h.title, offlineMark()),
-            el('p', { className: 'hike-away', hidden: true }),
-            el('p', { className: 'hike-facts' }, facts(h)),
-        ),
-    );
-}
-
-// ---------- phone: the list as a sheet pulled up from the bottom ----------
-// Three heights: 'min' (just the title), 'mid' (about half), 'max' (nearly all).
-
-const sheet = {
-    state: 'mid',
-    px: 0, // the height it is at (or moving to)
-    heights() {
-        const H = explore.clientHeight;
-        return { min: 92, mid: Math.round(H * 0.45), max: H - 48 };
-    },
-    height() { return phone.matches ? this.px : 0; },
-    set(state, { animate = true } = {}) {
-        this.state = state;
-        if (!phone.matches) { panel.style.height = ''; updateInsets(); return; }
-        panel.classList.toggle('no-anim', !animate);
-        this.px = this.heights()[state];
-        panel.style.height = `${this.px}px`;
-        panel.dataset.state = state;
-        explore.classList.toggle('list-full', state === 'max');
-        document.getElementById('panel-grip').setAttribute('aria-label', state === 'max' ? 'Show less of the list' : 'Show more of the list');
-        updateInsets();
-    },
+// What the parts of the page share (pick-cards.js reads it when a trail is tapped)
+const page = {
+    allHikes: [], // every hike you may see, newest first
+    hikesById: new Map(),
+    rowsById: new Map(), // their rows in the list
+    visible: new Set(), // ids of the hikes in the current list (scope, and "only on this device" when on)
+    overview: null, // the map (overview-map.js)
 };
 
-function updateInsets() {
-    // the card sits just above the sheet on phones
-    explore.style.setProperty('--sheet-h', `${Math.round(sheet.height())}px`);
-}
-
-function setupSheetDrag() {
-    const grip = document.getElementById('panel-grip');
-    const head = panel.querySelector('.panel-head');
-    let start = null;
-
-    const down = (e) => {
-        if (!phone.matches) return;
-        start = { y: e.clientY, h: panel.getBoundingClientRect().height, moved: false };
-        panel.classList.add('no-anim');
-        e.currentTarget.setPointerCapture(e.pointerId);
-    };
-    const move = (e) => {
-        if (!start) return;
-        const dy = e.clientY - start.y;
-        if (Math.abs(dy) > 6) start.moved = true;
-        const { min, max } = sheet.heights();
-        sheet.px = Math.min(max, Math.max(min, start.h - dy));
-        panel.style.height = `${sheet.px}px`;
-        updateInsets();
-    };
-    const up = () => {
-        if (!start) return;
-        const { moved } = start;
-        start = null;
-        panel.classList.remove('no-anim');
-        if (!moved) { // a tap: one step up, from the top back to the middle
-            sheet.set({ min: 'mid', mid: 'max', max: 'mid' }[sheet.state]);
-            return;
-        }
-        const h = panel.getBoundingClientRect().height;
-        const hs = sheet.heights();
-        const nearest = Object.entries(hs).sort((a, b) => Math.abs(a[1] - h) - Math.abs(b[1] - h))[0][0];
-        sheet.set(nearest);
-    };
-    for (const target of [grip, head]) {
-        target.addEventListener('pointerdown', down);
-        target.addEventListener('pointermove', move);
-        target.addEventListener('pointerup', up);
-        target.addEventListener('pointercancel', up);
-    }
-    // The grip is a button for keyboards too
-    grip.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); sheet.set(sheet.state === 'max' ? 'mid' : 'max'); }
-    });
-}
+const sheet = createSheet({ panel, explore, phone }); // phones: the list pulled up from the bottom
 
 // ---------- order of the list ----------
 // base order: newest first, or nearest first after a place search.
@@ -170,203 +68,23 @@ function setupSheetDrag() {
 // (closest to the middle of the map first), then the rest by distance.
 let baseOrder = [];
 let mapView = null;
-let rowsById = new Map();
-let hikesById = new Map();
 
 function applyOrder() {
     let ids = baseOrder;
     if (mapView) {
         const { center, inView } = mapView;
         ids = baseOrder
-            .map((id) => ({ id, on: inView.has(id), d: distanceToHike(hikesById.get(id), center) }))
+            .map((id) => ({ id, on: inView.has(id), d: distanceToHike(page.hikesById.get(id), center) }))
             .sort((a, b) => (b.on - a.on) || (a.d - b.d))
             .map((x) => x.id);
     }
     const now = [...list.children].map((r) => r.dataset.id);
-    if (now.join() !== ids.join()) list.append(...ids.map((id) => rowsById.get(id)));
+    if (now.join() !== ids.join()) list.append(...ids.map((id) => page.rowsById.get(id)));
 }
 
 function setBaseOrder(ids) {
     baseOrder = ids;
     applyOrder();
-}
-
-// ---------- search a place: hikes get sorted by how far away they are (none are hidden) ----------
-function setupFinder(rows, overview) {
-    const hikes = allHikes; // all of them get sorted (rows not in the current list are hidden)
-    const form = document.getElementById('place-search');
-    const input = document.getElementById('place-input');
-    const status = document.getElementById('place-status');
-    let busy = false;
-
-    const say = (...parts) => {
-        status.replaceChildren(...parts);
-        status.hidden = parts.length === 0;
-    };
-
-    function reset() {
-        input.value = '';
-        say();
-        overview.clearPlace();
-        overview.showAll();
-        for (const h of hikes) rows.get(h.id).querySelector('.hike-away').hidden = true;
-        setBaseOrder(hikes.map((h) => h.id));
-    }
-    const clearButton = () => el('button', { type: 'button', className: 'place-clear', textContent: 'Clear', onclick: reset });
-
-    form.addEventListener('submit', async (event) => {
-        event.preventDefault();
-        const query = input.value.trim();
-        if (!query) { reset(); return; }
-        if (busy) return;
-        busy = true;
-        input.blur(); // phones: put the keyboard away so the map shows
-        say('Looking for ', el('strong', { textContent: query }), '…');
-        try {
-            const place = await findPlace(query);
-            if (!place) {
-                say('Couldn’t find ', el('strong', { textContent: query }), ' on the map. ', clearButton());
-                return;
-            }
-            const point = [place.lat, place.lon];
-            const sorted = hikes
-                .map((h) => ({ h, d: distanceToHike(h, point) }))
-                .sort((a, b) => a.d - b.d);
-            for (const { h, d } of sorted) {
-                const away = rows.get(h.id).querySelector('.hike-away');
-                away.replaceChildren(icon('pin'), d < 1 ? 'right here' : `${fmtDist(d, d < 10 ? 1 : 0)} away`);
-                away.hidden = false;
-            }
-            mapView = null;
-            setBaseOrder(sorted.map(({ h }) => h.id));
-            overview.showPlace(place, sorted.find(({ h }) => visible.has(h.id))?.h);
-            say('Closest to ', el('strong', { textContent: place.label }), ' first. ', clearButton());
-        } catch {
-            say('Searching needs internet – couldn’t reach OpenStreetMap. ', clearButton());
-        } finally {
-            busy = false;
-        }
-    });
-    input.addEventListener('search', () => { if (!input.value.trim()) reset(); });
-}
-
-// ---------- cards for a tapped trail ----------
-// The tapped hike first, then the hikes nearest to it; swiping to a card picks
-// that hike out on the map. Tapping another trail starts a new row of cards.
-
-const NEAR_CARDS = 5; // how many nearby hikes follow the tapped one
-const CLOSE_SVG = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>';
-const ARROW_SVG = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>';
-
-let overview = null;
-let sheetBeforePick = null;
-let cardIds = [];       // hikes in the row of cards, in order
-let fromSwipe = false;  // the current pick came from swiping the cards
-
-const centreOf = (h) => [(h.bbox[0][0] + h.bbox[1][0]) / 2, (h.bbox[0][1] + h.bbox[1][1]) / 2];
-
-function card(h) {
-    const away = rowsById.get(h.id).querySelector('.hike-away');
-    return el('article', { className: 'pick-card' },
-        visual(h, 'pick-visual'),
-        el('div', { className: 'pick-info' },
-            el('h2', { className: 'pick-title', textContent: h.title }),
-            !away.hidden && el('p', { className: 'hike-away' }, ...[...away.childNodes].map((n) => n.cloneNode(true))),
-            el('p', { className: 'hike-facts' }, facts(h)),
-            el('div', { className: 'pick-actions' },
-                el('a', { className: 'pill pick-open', href: hikeUrl(h), textContent: 'Open hike' }),
-                el('button', { type: 'button', className: 'pick-zoom', textContent: 'Zoom to trail', onclick: () => overview.showHike(h.id) }),
-            ),
-        ),
-        el('button', { type: 'button', className: 'pick-close', ariaLabel: 'Close', title: 'Close', innerHTML: CLOSE_SVG, onclick: () => overview.select(null) }),
-    );
-}
-
-function buildCards(id) {
-    const from = hikesById.get(id);
-    const centre = centreOf(from);
-    const near = [...hikesById.values()]
-        .filter((h) => h.id !== id && visible.has(h.id))
-        .map((h) => ({ h, d: distanceToHike(h, centre) }))
-        .sort((a, b) => a.d - b.d)
-        .slice(0, NEAR_CARDS)
-        .map(({ h }) => h);
-    cardIds = [id, ...near.map((h) => h.id)];
-    track.replaceChildren(...[from, ...near].map((h) => {
-        const c = card(h);
-        c.dataset.id = h.id;
-        return c;
-    }));
-    strip.hidden = false;
-    track.scrollLeft = 0;
-    updateSteps();
-}
-
-/** Which card is showing (the one snapped to the left edge). */
-function currentCard() {
-    const cards = [...track.children];
-    const left = track.getBoundingClientRect().left;
-    return cards.reduce((best, c) =>
-        Math.abs(c.getBoundingClientRect().left - left - 10) < Math.abs(best.getBoundingClientRect().left - left - 10) ? c : best, cards[0]);
-}
-
-function updateSteps() {
-    const i = cardIds.indexOf(currentCard()?.dataset.id);
-    strip.querySelector('.pick-prev').hidden = i <= 0;
-    strip.querySelector('.pick-next').hidden = i < 0 || i >= cardIds.length - 1;
-}
-
-function step(dir) {
-    const cards = [...track.children];
-    const i = cards.indexOf(currentCard());
-    cards[Math.max(0, Math.min(cards.length - 1, i + dir))]?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'start' });
-}
-
-function setupCards() {
-    for (const [cls, dir] of [['.pick-prev', -1], ['.pick-next', 1]]) {
-        const b = strip.querySelector(cls);
-        b.innerHTML = ARROW_SVG;
-        b.addEventListener('click', () => step(dir));
-    }
-    // When a swipe settles, the card showing becomes the picked hike
-    let settle = null;
-    track.addEventListener('scroll', () => {
-        clearTimeout(settle);
-        settle = setTimeout(() => {
-            updateSteps();
-            const id = currentCard()?.dataset.id;
-            if (id && cardIds.includes(id)) {
-                fromSwipe = true;
-                overview.select(id);
-                fromSwipe = false;
-            }
-        }, 120);
-    }, { passive: true });
-}
-
-function onPick(id) {
-    for (const [rid, row] of rowsById) {
-        row.classList.toggle('dull', id != null && rid !== id);
-        row.classList.toggle('picked', rid === id);
-    }
-    if (id == null) {
-        strip.hidden = true;
-        cardIds = [];
-        if (sheetBeforePick) { sheet.set(sheetBeforePick); sheetBeforePick = null; }
-        return;
-    }
-    if (fromSwipe) {
-        overview.keepInView(id); // a swiped-to hike off screen: bring it in
-    } else {
-        buildCards(id);
-    }
-    if (phone.matches) {
-        // phones: tuck the list away so the cards and the map have room
-        if (!sheetBeforePick) sheetBeforePick = sheet.state;
-        sheet.set('min');
-    } else {
-        rowsById.get(id).scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-    }
 }
 
 // ---------- page ----------
@@ -379,8 +97,7 @@ phone.addEventListener('change', () => sheet.set('mid', { animate: false }));
 
 renderBackdrop(null, APP_CONFIG.indexBackground);
 sheet.set('mid', { animate: false });
-setupSheetDrag();
-setupCards();
+const cards = createPickCards({ strip, track, sheet, phone, page });
 
 setupProfileMenu(document.getElementById('site-bar'));
 setupCover();
@@ -394,10 +111,8 @@ const EMPTY = {
     shared: 'Nobody has shared a hike with you yet.',
 };
 const baseTitle = document.title;
-let allHikes = [];
-let visible = new Set(); // ids of the hikes in the current list (scope, and "only on this device" when on)
 let scopeIds = new Set(); // ids in the current scope
-const shownHikes = () => allHikes.filter((h) => visible.has(h.id));
+const shownHikes = () => page.allHikes.filter((h) => page.visible.has(h.id));
 const emptyNote = el('p', { className: 'error', hidden: true });
 list.before(emptyNote);
 let scopeChip = null;
@@ -405,7 +120,7 @@ let locate = null;
 
 async function setScope(scope, { first = false } = {}) {
     scopeIds = new Set((await listHikes(scope)).map((h) => h.id));
-    visible = filterOffline(scopeIds);
+    page.visible = filterOffline(scopeIds);
 
     const { heading, title } = SCOPES[scope];
     document.querySelector('.panel-head h1').textContent = heading;
@@ -422,18 +137,18 @@ async function setScope(scope, { first = false } = {}) {
         document.querySelector('.panel-head').after(scopeChip);
     }
 
-    for (const [id, row] of rowsById) row.hidden = !visible.has(id);
+    for (const [id, row] of page.rowsById) row.hidden = !page.visible.has(id);
     emptyNote.textContent = EMPTY[scope];
-    emptyNote.hidden = visible.size > 0;
+    emptyNote.hidden = page.visible.size > 0;
     renderTotals(shownHikes());
     if (!first) list.scrollTop = 0;
-    overview?.setVisible(visible, { animate: !first });
+    page.overview?.setVisible(page.visible, { animate: !first });
     locate?.refresh();
 }
 
 listHikes('all')
     .then(async (hikes) => {
-        allHikes = hikes;
+        page.allHikes = hikes;
         if (!hikes.length) {
             renderTotals(hikes);
             emptyNote.textContent = EMPTY.all;
@@ -442,12 +157,12 @@ listHikes('all')
         }
         const rows = new Map(hikes.map((h) => [h.id, hikeRow(h)]));
         for (const [id, row] of rows) row.dataset.id = id;
-        rowsById = rows;
-        hikesById = new Map(hikes.map((h) => [h.id, h]));
+        page.rowsById = rows;
+        page.hikesById = new Map(hikes.map((h) => [h.id, h]));
         list.append(...rows.values());
         baseOrder = hikes.map((h) => h.id);
 
-        overview = overviewMap(document.getElementById('overview-map'), hikes, onPick, (view) => {
+        const overview = overviewMap(document.getElementById('overview-map'), hikes, cards.onPick, (view) => {
             mapView = view;
             applyOrder();
         }, {
@@ -459,11 +174,17 @@ listHikes('all')
                 return phone.matches ? { bottom: sheet.height() + cardH } : { left: panel.offsetWidth + 12, bottom: cardH };
             },
         });
+        page.overview = overview;
         for (const [id, row] of rows) {
             row.addEventListener('pointerenter', () => overview.highlight(id, true));
             row.addEventListener('pointerleave', () => overview.highlight(id, false));
         }
-        setupFinder(rows, overview);
+        setupPlaceFinder({
+            hikes, rows, overview,
+            isVisible: (id) => page.visible.has(id),
+            setBaseOrder,
+            forgetMapView: () => { mapView = null; },
+        });
 
         const youStatus = document.getElementById('you-status');
         locate = setupOverviewLocate(overview, shownHikes, (text) => {
@@ -473,6 +194,9 @@ listHikes('all')
 
         await setScope(currentScope(), { first: true });
         window.addEventListener(SCOPE_EVENT, (e) => setScope(e.detail));
+        // Walking times follow the pace set on a hike page (also when coming back with the back button)
+        onPaceChange(() => updateWalkTimes(page.hikesById));
+        window.addEventListener('pageshow', (e) => { if (e.persisted) updateWalkTimes(page.hikesById); });
     })
     .then(setupOffline)
     .catch((err) => list.append(el('p', { className: 'error', textContent: err.message })));
@@ -494,7 +218,7 @@ const offlineChip = el('button', { type: 'button', className: 'offline-chip', hi
 offlineChip.setAttribute('aria-pressed', 'false');
 
 function renderOfflineChip() {
-    offlineChip.hidden = !offline() || !allHikes.length;
+    offlineChip.hidden = !offline() || !page.allHikes.length;
     offlineChip.setAttribute('aria-pressed', String(onlySaved));
     offlineChip.replaceChildren(
         el('span', { className: 'offline-dot', ariaHidden: 'true' }),
@@ -506,7 +230,7 @@ function renderOfflineChip() {
 
 function applyOffline() {
     document.documentElement.classList.toggle('is-offline', offline());
-    for (const [id, row] of rowsById) {
+    for (const [id, row] of page.rowsById) {
         const state = stateOf(states, id);
         row.dataset.offline = state;
         const mark = row.querySelector('.offline-mark');
@@ -516,11 +240,11 @@ function applyOffline() {
     }
     renderOfflineChip();
     const next = filterOffline(scopeIds);
-    if ([...next].join() !== [...visible].join()) {
-        visible = next;
-        for (const [id, row] of rowsById) row.hidden = !visible.has(id);
+    if ([...next].join() !== [...page.visible].join()) {
+        page.visible = next;
+        for (const [id, row] of page.rowsById) row.hidden = !page.visible.has(id);
         renderTotals(shownHikes());
-        overview?.setVisible(visible);
+        page.overview?.setVisible(page.visible);
         locate?.refresh();
     }
 }
@@ -531,7 +255,7 @@ async function refreshStates() {
 }
 
 function setupOffline() {
-    if (!allHikes.length) return;
+    if (!page.allHikes.length) return;
     document.querySelector('.panel-head').after(offlineChip);
     offlineChip.addEventListener('click', () => { onlySaved = !onlySaved; applyOffline(); });
     window.addEventListener('online', applyOffline);

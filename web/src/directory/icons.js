@@ -1,6 +1,6 @@
 // Small line icons for hike numbers (monochrome, drawn in the text color via CSS .fact-icon)
 
-import { el } from './data.js';
+import { el } from '../lib/data.js';
 
 const NS = 'http://www.w3.org/2000/svg';
 

@@ -39,7 +39,7 @@ export function setupErrorReports() {
     } catch { /* reporting must never break the book */ }
 }
 
-// Place search (src/lib/place-search.js) puts the search text in the address
+// Place search (src/directory/place-search.js) puts the search text in the address
 const SEARCH_HOSTS = ['nominatim.openstreetmap.org'];
 
 /** A fetch step to the place search: drop the address's query (the search text). */

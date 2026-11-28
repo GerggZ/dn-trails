@@ -36,3 +36,7 @@ wedding_hikes/
 .idea
 .DS_Store
 Thumbs.db
+
+# --- Test output (Playwright) ---
+web/test-results/
+web/playwright-report/

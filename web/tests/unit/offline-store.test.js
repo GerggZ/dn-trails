@@ -5,7 +5,7 @@ import { describe, test, expect, vi } from 'vitest';
 // The map library needs a browser; these tests only need the map addresses
 vi.mock('leaflet', () => ({ default: { TileLayer: { extend: () => class {} }, tileLayer: () => ({}) } }));
 
-const { fmtSize, tileUrls, tileKey, stateOf, LEVELS, offlineLayer } = await import('../../src/lib/offline-store.js');
+const { fmtSize, tileUrls, tileKey, stateOf, LEVELS, offlineLayer } = await import('../../src/offline/offline-store.js');
 
 // Uliari-Bira's outline (small hike) and Watzmann's (big one)
 const SMALL = [[43.326223, -1.970841], [43.335162, -1.958087]];

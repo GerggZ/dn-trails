@@ -10,7 +10,7 @@
 // button (all hikes). Esc and the phone's back button close full screen.
 
 import L from 'leaflet';
-import { addMapLayers } from './map-layers.js';
+import { addMapLayers } from '../lib/map-layers.js';
 import { APP_CONFIG } from '../config.js';
 
 const C = APP_CONFIG.colors;
@@ -163,7 +163,7 @@ export function overviewMap(mapBox, hikes, onSelect = () => {}, onView = () => {
         onView({ center: [c.lat, c.lng], inView });
     });
 
-    // --- full screen (same idea as the hike map; see src/hike/map-elevation.js section 6) ---
+    // --- full screen (same idea as the hike map; see src/hike/trail/map-elevation.js section 6) ---
     let toggleFull = () => {}; // set up below when this map has a full-screen mode
     if (fullscreen) setupFullScreen();
     function setupFullScreen() {

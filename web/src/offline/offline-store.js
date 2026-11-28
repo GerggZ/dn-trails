@@ -15,8 +15,8 @@
 //   not available  needs internet
 
 import { APP_CONFIG } from '../config.js';
-import { asset } from './data.js';
-import { tileUrl } from './map-layers.js';
+import { asset } from '../lib/data.js';
+import { tileUrl } from '../lib/map-layers.js';
 import { DATA, PHOTOS, TILES, DL_PHOTOS, DL_TILES, MOVED_MARK, tileKey } from './offline-common.js';
 
 // Shared with the service worker (offline-common.js); re-exported for the hike page and tests

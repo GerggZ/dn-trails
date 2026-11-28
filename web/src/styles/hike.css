@@ -282,21 +282,6 @@
 }
 .profile-stops title { pointer-events: none; }
 
-/* Leaflet attribution in our fonts */
-.leaflet-container { font-family: var(--font-book); }
-.leaflet-tooltip {
-    font-family: var(--font-sign);
-    font-size: 13px;
-    font-weight: 600;
-    padding: 3px 8px;
-    border-radius: 3px;
-    border: 1px solid color-mix(in srgb, var(--ink) 28%, transparent);
-    background: color-mix(in srgb, var(--paper) 94%, white);
-    color: var(--ink);
-    box-shadow: 0 1px 4px color-mix(in srgb, var(--ink) 18%, transparent);
-}
-.leaflet-tooltip::before { display: none; }
-
 /* --- Your location --- */
 /* (the map buttons themselves are styled in map-controls.css) */
 

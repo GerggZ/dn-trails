@@ -177,7 +177,7 @@ def build_hike(folder: Path) -> dict | None:
     ground, ground_fallback = ground_types(folder, info, gpx)
     time_s = timing.walking_time_s(dist_km, grade, ground)
     km = fetch_osm.summary_km(ground, dist_km)
-    print(f"    walking time ≈ {time_s[-1] / 3600:.1f} h  ("
+    print(f"    model walking time ≈ {time_s[-1] / 3600:.1f} h, before calibration and pace  ("
           + ", ".join(f"{g} {v} km" for g, v in km.items() if v) + ")")
 
     waypoints = []
@@ -252,6 +252,10 @@ def build_hike(folder: Path) -> dict | None:
         "line": simplified_line(gpx.lat, gpx.lon, LINE_TOLERANCE_M, 5),        # closer views
         "waypoints": waypoints,
         "photos": photos,
+        # The model's time by slope and ground, so the main page can show each hike's
+        # time at the reader's pace without loading the whole track
+        "time_by_slope": timing.time_by_slope(
+            np.round(time_s), np.round(timing.segment_slopes_deg(grade), 1), ground[:-1]),
         "track": {
             "lat": np.round(gpx.lat, 6).tolist(),
             "lon": np.round(gpx.lon, 6).tolist(),
@@ -418,7 +422,7 @@ def main() -> None:
                 shutil.rmtree(stale)
 
     card_keys = ("id", "title", "date", "location", "difficulty", "owner", "public", "shared_with",
-                 "cover", "cover_src", "bbox", "stats", "profile", "line_xs", "line")
+                 "cover", "cover_src", "bbox", "stats", "time_by_slope", "profile", "line_xs", "line")
     index = [
         {k: h.get(k) for k in card_keys}
         for h in sorted(hikes, key=lambda h: h["date"] or "", reverse=True)

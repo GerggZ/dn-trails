@@ -8,7 +8,7 @@
 //
 // Two piles for photos and map tiles:
 //   downloads (hb-dl-*)   what "Save for offline" stored. Kept until the reader removes it
-//                         (src/lib/offline-store.js, src/hike/offline.js). Never trimmed here.
+//                         (src/offline/offline-store.js, src/hike/offline.js). Never trimmed here.
 //   browsing (hb-photos, hb-tiles)  whatever the reader happened to look at. Rolling:
 //                         past MAX_PHOTO_BYTES / MAX_TILES the least recently used goes first.
 // Lookup: downloads -> browsing -> network.
@@ -17,7 +17,7 @@
 // the download code and version check use that to get fresh copies.
 //
 // This file isn't served as it is: `npm run build` bundles it (with the shared
-// src/lib/offline-common.js) into dist/sw.js, see vite.config.js. The build also
+// src/offline/offline-common.js) into dist/sw.js, see vite.config.js. The build also
 // fills in the two values below, so each deploy installs a fresh service worker:
 // new pages, and the saved hike data refreshed.
 
@@ -25,7 +25,7 @@
 import {
     DATA, PHOTOS, TILES, DL_PHOTOS, DL_TILES, MOVED_MARK as MOVED_MARK_PATH,
     TILE_HOSTS, tileKey, fetchTile,
-} from './lib/offline-common.js';
+} from './offline/offline-common.js';
 
 // The build's version stamp
 const VERSION = __SW_VERSION__;

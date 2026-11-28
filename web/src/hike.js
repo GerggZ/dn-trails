@@ -14,13 +14,13 @@ import { renderBackdrop } from './lib/backdrop.js';
 import { BOOK_NAME } from './lib/edition.js';
 import { setupErrorReports } from './lib/errors.js';
 import { registerServiceWorker } from './lib/pwa.js';
-import { renderMapAndElevation } from './hike/map-elevation.js';
+import { renderMapAndElevation } from './hike/trail/map-elevation.js';
 import { renderGallery } from './hike/gallery.js';
 import { setupLocate } from './hike/locate.js';
 import { setupOfflineSave } from './hike/offline.js';
 import { watchForUpdates } from './lib/version.js';
 import { keepFullScreen } from './lib/full-screen.js';
-import { prepareOfflineStore } from './lib/offline-store.js';
+import { prepareOfflineStore } from './offline/offline-store.js';
 
 setupErrorReports();
 registerServiceWorker();

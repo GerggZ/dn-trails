@@ -13,7 +13,7 @@
 // only Downloads (not in npm run dev, where offline doesn't work).
 
 import { currentUser, currentUserId, setCurrentUser, loadUsers, scopeCounts, SCOPES, el } from './data.js';
-import { offlineAvailable, downloadedHikes, cachedHikes, removeOffline, savedIds, fmtSize, LEVELS, CHANGE_EVENT } from './offline-store.js';
+import { offlineAvailable, downloadedHikes, cachedHikes, removeOffline, savedIds, fmtSize, LEVELS, CHANGE_EVENT } from '../offline/offline-store.js';
 import { ACCOUNTS, BOOK_NAME } from './edition.js';
 import { loadCover, openCover } from './cover.js';
 

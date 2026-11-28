@@ -9,7 +9,7 @@
 // taken off again, an older copy of the hike stays as it was.
 // Always saves the map marked offline: true in config.js (Park), whatever map is on screen.
 //
-// "Remove offline copy" takes it off again (src/lib/offline-store.js, also used
+// "Remove offline copy" takes it off again (src/offline/offline-store.js, also used
 // by the "Downloaded" list in the profile menu).
 
 import { asset } from '../lib/data.js';
@@ -17,8 +17,8 @@ import {
     LEVELS, PARALLEL, TILE_KB, CHANGE_EVENT, DATA, PHOTOS, TILES, DL_PHOTOS, DL_TILES,
     offlineAvailable, offlineLayer, tileUrls, runLimited, readSaved, writeSaved, removeOffline,
     moveToDownloads, keepStorage, isQuotaError,
-} from '../lib/offline-store.js';
-import { fetchTile, refusesCors } from '../lib/offline-common.js';
+} from '../offline/offline-store.js';
+import { fetchTile, refusesCors } from '../offline/offline-common.js';
 
 class OutOfSpace extends Error {}
 

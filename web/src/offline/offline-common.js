@@ -1,5 +1,5 @@
 // What the service worker (src/sw.js) and the page's offline code
-// (src/lib/offline-store.js, src/hike/offline.js) must agree on: cache names,
+// (src/offline/offline-store.js, src/hike/offline.js) must agree on: cache names,
 // which hosts are map servers, one address per map piece, and how a map piece
 // is fetched. The build bundles this into sw.js too (vite.config.js), so keep
 // it free of anything page-only (window, document, localStorage, config.js).

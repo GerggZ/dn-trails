@@ -11,7 +11,7 @@ import { APP_CONFIG } from './src/config.js';
 // The same stamp goes into dist/sw.js, so every deploy also refreshes the
 // offline copy on phones (no more bumping VERSION by hand).
 
-// The service worker (src/sw.js + the shared src/lib/offline-common.js) is bundled
+// The service worker (src/sw.js + the shared src/offline/offline-common.js) is bundled
 // on its own into one plain script, dist/sw.js: a service worker can't load the
 // site's module chunks. `version` and `files` (assets/… to save at install) are filled in.
 async function buildServiceWorker(outDir, version, files) {

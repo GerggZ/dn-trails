@@ -170,7 +170,7 @@
 .leaflet-right .leaflet-control { margin-right: 10px; }
 .leaflet-bottom.leaflet-right .leaflet-control-attribution { margin-right: 0; }
 
-/* --- Stop symbols (src/lib/stops.js) and their names, lettered like a printed park map --- */
+/* --- Stop symbols (src/hike/trail/stops.js) and their names, lettered like a printed park map --- */
 .leaflet-marker-icon.stop-symbol { background: none; border: 0; }
 .stop-symbol svg { display: block; }
 
@@ -190,3 +190,20 @@
 .leaflet-tooltip.map-label::before { display: none; }
 .leaflet-tooltip.map-label-peak { font-size: 13px; }
 
+/* Map text in the book's fonts, on both pages (trail names on the main page, readouts) */
+.leaflet-container { font-family: var(--font-book); }
+.leaflet-tooltip {
+    font-family: var(--font-sign);
+    font-size: 13px;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 3px;
+    border: 1px solid color-mix(in srgb, var(--ink) 28%, transparent);
+    background: color-mix(in srgb, var(--paper) 94%, white);
+    color: var(--ink);
+    box-shadow: 0 1px 4px color-mix(in srgb, var(--ink) 18%, transparent);
+}
+.leaflet-tooltip::before { display: none; }
+
+/* Stop names hidden when zoomed out past the whole trail (src/hike/trail/trail-map.js) */
+.names-hidden .leaflet-tooltip.map-label { display: none; }

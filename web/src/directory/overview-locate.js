@@ -7,7 +7,7 @@
 
 import L from 'leaflet';
 import { distanceToHike } from './place-search.js';
-import { fmtDist } from './units.js';
+import { fmtDist } from '../lib/units.js';
 
 const REMEMBER_KEY = 'hb-locate-on';
 const NEAR_KM = 1;          // this close to a trail (plus GPS accuracy) = "you're at this hike"
